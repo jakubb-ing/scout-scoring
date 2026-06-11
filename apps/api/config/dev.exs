@@ -48,9 +48,6 @@ config :api, ApiWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :api, dev_routes: true
 
-# Base URL of the organizer/judge web app — used to build QR landing URLs.
-config :api, :web_base_url, "http://localhost:3000"
-
 # Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n"
 

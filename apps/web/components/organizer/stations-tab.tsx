@@ -407,15 +407,15 @@ function LoginCardsDialog({
   // QR URLs carry only station id + PIN. The judge-facing page exchanges
   // that short URL for a station token and stores it locally.
   const reissue = useReissueStationTokens(raceId);
-  const [issued, setIssued] = useState<Record<string, { qr_url?: string; pin?: string }>>({});
+  const [issued, setIssued] = useState<Record<string, { pin?: string }>>({});
   const [mounted, setMounted] = useState(false);
 
   const issue = useCallback(async () => {
     try {
       const payload = await reissue.mutateAsync();
-      const byId: Record<string, { qr_url?: string; pin?: string }> = {};
+      const byId: Record<string, { pin?: string }> = {};
       for (const s of payload.stations) {
-        byId[s.id] = { qr_url: s.qr_url, pin: s.pin };
+        byId[s.id] = { pin: s.pin };
       }
       setIssued(byId);
     } catch {
@@ -431,11 +431,16 @@ function LoginCardsDialog({
     window.print();
   }
 
-  const rows = stations.map((s) => ({
-    ...s,
-    qr_url: issued[s.id]?.qr_url ?? s.qr_url ?? (s.pin && mounted ? `${window.location.origin}/station/${s.id}?pin=${s.pin}` : undefined),
-    pin: issued[s.id]?.pin ?? s.pin,
-  }));
+  const rows = stations.map((s) => {
+    const pin = issued[s.id]?.pin ?? s.pin;
+    return {
+      ...s,
+      // URL se skládá vždy z aktuální domény, aby karty fungovaly
+      // pro libovolné nasazení FE bez konfigurace.
+      qr_url: pin && mounted ? `${window.location.origin}/station/${s.id}?pin=${pin}` : undefined,
+      pin,
+    };
+  });
 
   const renderLoginCard = (s: Station) => (
     <div key={s.id} className="login-card flex items-center gap-4 rounded-lg border border-border p-4">

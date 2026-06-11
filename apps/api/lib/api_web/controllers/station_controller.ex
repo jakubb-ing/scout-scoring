@@ -4,6 +4,10 @@ defmodule ApiWeb.StationController do
 
   alias Api.{Auth.StationToken, Races, Scoring}
 
+  plug ApiWeb.Plugs.RateLimit,
+       [bucket: "station_login", limit: 10, window_ms: 60_000, by_param: "station_id"]
+       when action in [:login]
+
   @station_token_ttl 72 * 60 * 60
 
   def login(conn, %{"station_id" => station_id, "pin" => pin}) do

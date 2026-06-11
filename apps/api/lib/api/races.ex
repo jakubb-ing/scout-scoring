@@ -124,9 +124,10 @@ defmodule Api.Races do
   end
 
   @doc """
-  Re-issues fresh station tokens, PINs, and QR URLs for every station on
-  an already-active race. Rotating invalidates any previously-printed QR
-  codes — that's the feature, not a bug.
+  Re-issues fresh station tokens and PINs for every station on an
+  already-active race. Rotating invalidates any previously-printed QR
+  codes — that's the feature, not a bug. QR URLs are built client-side
+  from the frontend's own origin.
   """
   def reissue_station_tokens(race_id, organizer_id) do
     with {:ok, race} <- ensure_race_edit(race_id, organizer_id),
@@ -138,8 +139,6 @@ defmodule Api.Races do
   end
 
   defp issue_tokens_for(%{"id" => race_id}, stations) do
-    base = web_base_url()
-
     updated =
       Enum.map(stations, fn %{"id" => sid} = station ->
         pin = StationToken.generate_pin()
@@ -152,16 +151,11 @@ defmodule Api.Races do
 
         Map.merge(station, %{
           "pin" => pin,
-          "access_token_hash" => nonce,
-          "qr_url" => "#{base}/station/#{sid}?pin=#{pin}"
+          "access_token_hash" => nonce
         })
       end)
 
     {:ok, %{race_id: race_id, stations: updated}}
-  end
-
-  defp web_base_url do
-    Application.get_env(:api, :web_base_url, "http://localhost:3000")
   end
 
   def close_race(id, organizer_id) do
@@ -580,7 +574,7 @@ defmodule Api.Races do
 
     case typed_update do
       {:ok, station} when is_map(station) ->
-        {:ok, Map.put(station, "qr_url", "#{web_base_url()}/station/#{station["id"]}?pin=#{pin}")}
+        {:ok, station}
 
       {:ok, nil} ->
         fallback_activate_station_record(id, allow_half_points, pin, nonce)
@@ -610,7 +604,7 @@ defmodule Api.Races do
            nonce: nonce
          }) do
       {:ok, station} when is_map(station) ->
-        {:ok, Map.put(station, "qr_url", "#{web_base_url()}/station/#{station["id"]}?pin=#{pin}")}
+        {:ok, station}
 
       err ->
         err
@@ -701,8 +695,7 @@ defmodule Api.Races do
          {:ok, _race} <- ensure_race_edit(station["race"], organizer_id) do
       case SurrealDB.one(sql, %{id: id, pin: pin, nonce: nonce}) do
         {:ok, station} when is_map(station) ->
-          {:ok,
-           Map.put(station, "qr_url", "#{web_base_url()}/station/#{station["id"]}?pin=#{pin}")}
+          {:ok, station}
 
         {:ok, nil} ->
           {:error, :not_found}

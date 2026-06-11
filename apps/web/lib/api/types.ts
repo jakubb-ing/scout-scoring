@@ -83,7 +83,7 @@ export interface Station {
   token_nonce?: string | null;
   access_token_hash?: string;
   access_token_raw?: string;
-  qr_url?: string; // helper built by BE for Login Cards
+  qr_url?: string; // built client-side from window.location.origin for Login Cards
 }
 
 export interface PublicStationRace {

@@ -3,6 +3,10 @@ defmodule ApiWeb.AuthController do
 
   alias Api.{Accounts, Auth.Guardian, AuditLog}
 
+  plug ApiWeb.Plugs.RateLimit,
+       [bucket: "auth_login", limit: 10, window_ms: 60_000, by_param: "email"]
+       when action in [:login]
+
   def login(conn, %{"email" => email, "password" => password}) do
     case Accounts.authenticate(email, password) do
       {:ok, org} ->

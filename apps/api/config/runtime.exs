@@ -42,13 +42,37 @@ config :api, Api.SurrealDB,
   user: System.get_env("SURREAL_USER", "root"),
   pass: System.get_env("SURREAL_PASS", "root")
 
-if guardian_secret = System.get_env("GUARDIAN_SECRET") do
-  config :api, Api.Auth.Guardian, secret_key: guardian_secret
-end
+if config_env() == :prod do
+  # In production both signing secrets are mandatory. Without them the app
+  # would silently fall back to the well-known dev defaults baked into
+  # config.exs / StationToken, letting anyone forge organizer JWTs or station
+  # tokens. Fail fast instead.
+  guardian_secret =
+    System.get_env("GUARDIAN_SECRET") ||
+      raise """
+      environment variable GUARDIAN_SECRET is missing.
+      You can generate one by calling: mix phx.gen.secret
+      """
 
-config :api,
-       :station_token_secret,
-       System.get_env("STATION_TOKEN_SECRET", "dev-station-secret-change-me")
+  config :api, Api.Auth.Guardian, secret_key: guardian_secret
+
+  station_token_secret =
+    System.get_env("STATION_TOKEN_SECRET") ||
+      raise """
+      environment variable STATION_TOKEN_SECRET is missing.
+      You can generate one by calling: mix phx.gen.secret
+      """
+
+  config :api, :station_token_secret, station_token_secret
+else
+  if guardian_secret = System.get_env("GUARDIAN_SECRET") do
+    config :api, Api.Auth.Guardian, secret_key: guardian_secret
+  end
+
+  config :api,
+         :station_token_secret,
+         System.get_env("STATION_TOKEN_SECRET", "dev-station-secret-change-me")
+end
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
