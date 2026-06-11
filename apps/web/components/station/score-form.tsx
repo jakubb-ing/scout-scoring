@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { CheckCircle2, /* Clock, */ Loader2 } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -102,7 +102,8 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
     reset(createDefaultValues(criteria, existing));
   }, [criteria, existing, reset]);
 
-  const withTime = watch("withTime");
+  // Dočasně skryto spolu s blokem „Zaznamenat čas" níže.
+  // const withTime = watch("withTime");
   const watchedPoints = useWatch({ control, name: "points" });
   const submitting = upsert.isPending;
 
@@ -145,7 +146,7 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-3.5 sm:px-0">
         <div>
           <div className="text-12 text-scout-text-muted">
-            <span className="font-mono">#{patrol.start_number}</span> · {formatCategory(patrol.category)}
+            <span className="font-mono">#{patrol.start_number}</span> · {patrol.category_name ?? formatCategory(patrol.category)}
           </div>
           <div className="text-21 font-bold text-scout-text">{patrol.name}</div>
         </div>
@@ -181,6 +182,7 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
         </div>
       </div>
 
+      {/* Dočasně skryto — zaznamenávání času příchodu/odchodu.
       <div className="mx-3.5 mt-4 rounded-12 border border-scout-border bg-white p-4 sm:mx-0">
         <div className="flex items-center justify-between">
           <Label className="flex items-center gap-2 text-scout-text">
@@ -203,6 +205,7 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
           </div>
         ) : null}
       </div>
+      */}
 
       <div className="mx-3.5 mt-4 flex items-center gap-3 border-t-1.5 border-scout-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0">
         <div className="min-w-0 flex-1">
@@ -317,5 +320,7 @@ function formatCategory(category?: string | null) {
   if (normalized === "d") return "Dívčí";
   if (normalized === "ch") return "Chlapecká";
   if (normalized === "n") return "Nesoutěžní";
+  // Record ID kategorie není pro rozhodčí čitelné — radši nic neukazovat.
+  if (normalized.startsWith("category:")) return "Bez kategorie";
   return category;
 }

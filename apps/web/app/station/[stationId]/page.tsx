@@ -159,7 +159,7 @@ export default function StationPage() {
             )}
             <div className="min-w-0">
               <div className="text-11 text-white/50">
-                Stanoviště #{stationId}
+                Stanoviště
               </div>
               <div className="truncate text-20 font-bold leading-tight">{station.name}</div>
             </div>

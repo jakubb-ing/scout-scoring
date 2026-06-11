@@ -61,6 +61,7 @@ export interface Patrol {
   start_number: number;
   name: string;
   category?: string | null;
+  category_name?: string | null;
   members?: string[];
   selfservice_code?: string | null;
 }

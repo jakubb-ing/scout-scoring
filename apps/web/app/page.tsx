@@ -40,6 +40,14 @@ export default function LandingPage() {
               Otevřít dashboard <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+          >
+            <Link href="/station">Jsem rozhodčí — zápis bodů</Link>
+          </Button>
         </div>
         </div>
       </section>

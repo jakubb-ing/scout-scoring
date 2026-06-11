@@ -313,7 +313,7 @@ defmodule Api.Races do
   def list_patrols_public(race_id) do
     # Used by station clients: only minimal fields, no organizer auth needed.
     SurrealDB.all(
-      "SELECT id, start_number, name, category FROM patrol WHERE race = $race ORDER BY start_number;",
+      "SELECT id, start_number, name, category, category.name AS category_name FROM patrol WHERE race = $race ORDER BY start_number;",
       %{race: race_id}
     )
   end

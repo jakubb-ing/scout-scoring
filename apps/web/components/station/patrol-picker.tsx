@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, ChevronRight, Search } from "lucide-react";
+import { CategoryBadge } from "@/components/category-badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { Patrol, ScoreEntry } from "@/lib/api/types";
@@ -111,7 +112,9 @@ function PatrolRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-15 font-semibold text-scout-text">{patrol.name}</span>
-        <span className="mt-0.25 block truncate text-12 text-scout-text-muted">{formatCategory(patrol.category)}</span>
+        <span className="mt-1 block truncate">
+          <CategoryBadge label={patrol.category_name ?? formatCategory(patrol.category)} />
+        </span>
       </span>
       {done ? (
         <span className="inline-flex shrink-0 items-center gap-1 text-12 font-bold text-scout-green">
@@ -131,5 +134,7 @@ function formatCategory(category?: string | null) {
   if (normalized === "d") return "Dívčí";
   if (normalized === "ch") return "Chlapecká";
   if (normalized === "n") return "Nesoutěžní";
+  // Record ID kategorie není pro rozhodčí čitelné — radši nic neukazovat.
+  if (normalized.startsWith("category:")) return "Bez kategorie";
   return category;
 }

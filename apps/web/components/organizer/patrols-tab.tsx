@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { CategoryBadge } from "@/components/category-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -212,37 +213,6 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
 
 function getPatrolCategoryLabel(patrol: Patrol, categories: { id: string; name: string }[]) {
   return categories.find((c) => c.id === patrol.category)?.name ?? patrol.category ?? "—";
-}
-
-function getCategoryKind(label: string) {
-  const normalized = label.toLowerCase();
-
-  if (normalized.includes("hol") || normalized.includes("dív") || normalized === "d") {
-    return "girls";
-  }
-
-  if (normalized.includes("klu") || normalized.includes("chlap") || normalized === "ch") {
-    return "boys";
-  }
-
-  if (normalized.includes("nesout")) {
-    return "open";
-  }
-
-  return "other";
-}
-
-function CategoryBadge({ label }: { label: string }) {
-  const kind = getCategoryKind(label);
-  const tone = kind === "girls"
-    ? "bg-pink-100 text-pink-800"
-    : kind === "boys"
-      ? "bg-sky-100 text-sky-800"
-      : kind === "open"
-        ? "bg-slate-100 text-slate-700"
-        : "bg-scout-category-open text-scout-text-warm";
-
-  return <span className={`inline-flex rounded-full px-2 py-0.75 text-11 font-semibold ${tone}`}>{label}</span>;
 }
 
 function PatrolDialog({
