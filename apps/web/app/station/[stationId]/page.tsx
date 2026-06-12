@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, LogOut, QrCode, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, Phone, QrCode, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -169,6 +169,11 @@ export default function StationPage() {
             <Badge variant="secondary" className="hidden bg-white/10 text-white/80 sm:inline-flex">
               {entries.length}/{payload.patrols.length} hlídek
             </Badge>
+            <Button asChild variant="ghost" size="icon" className="text-white/80 hover:bg-white/10 hover:text-white" aria-label="Zavolat pořadateli">
+              <a href="tel:776884100">
+                <Phone className="h-4 w-4" />
+              </a>
+            </Button>
             <Button variant="ghost" size="icon" onClick={refresh} className="text-white/80 hover:bg-white/10 hover:text-white" aria-label="Obnovit">
               <RefreshCw className="h-4 w-4" />
             </Button>
