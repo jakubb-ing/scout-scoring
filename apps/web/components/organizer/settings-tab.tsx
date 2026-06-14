@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleHelp, Plus, Share2, Trash2, X } from "lucide-react";
+import { CircleHelp, Copy, Plus, RefreshCw, Share2, Trash2, X } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -19,9 +19,18 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useDeleteRaceMember,
   useRace,
   useRaceMembers,
+  useRegeneratePublicCode,
   useShareRace,
   useUpdateRace,
   useUpdateRaceMember,
@@ -79,9 +88,12 @@ export function SettingsTab({ raceId }: { raceId: string }) {
   const shareRace = useShareRace(raceId);
   const updateMember = useUpdateRaceMember(raceId);
   const deleteMember = useDeleteRaceMember(raceId);
+  const regeneratePublicCode = useRegeneratePublicCode(raceId);
   const [shareEmail, setShareEmail] = useState("");
   const [shareEmailError, setShareEmailError] = useState<string | null>(null);
   const [shareRole, setShareRole] = useState<"read" | "edit">("read");
+  const [resultsOrigin, setResultsOrigin] = useState("");
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
 
   const {
     control,
@@ -121,6 +133,31 @@ export function SettingsTab({ raceId }: { raceId: string }) {
       timeMode: toTimeModeValue(race.time_tracking),
     });
   }, [race, resetSettings]);
+
+  useEffect(() => {
+    setResultsOrigin(window.location.origin);
+  }, []);
+
+  async function onRegeneratePublicCode() {
+    try {
+      await regeneratePublicCode.mutateAsync();
+      setRegenerateOpen(false);
+      toast.success("Nový kód vygenerován. Starý odkaz už neplatí.");
+    } catch {
+      toast.error("Vygenerování se nepodařilo.");
+    }
+  }
+
+  async function onCopyResultsLink() {
+    if (!resultsOrigin) return;
+    const url = `${resultsOrigin}/dashboard/results?raceId=${encodeURIComponent(raceId)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Odkaz zkopírován.");
+    } catch {
+      toast.error("Odkaz se nepodařilo zkopírovat.");
+    }
+  }
 
   async function onSave(values: SettingsFormValues) {
     try {
@@ -380,6 +417,76 @@ export function SettingsTab({ raceId }: { raceId: string }) {
             )}
           </div>
         </section>
+      ) : null}
+
+      {!readOnlyAccess ? (
+        <>
+          <Separator />
+
+          <section className="rounded-12 border border-scout-border bg-white p-5">
+            <div className="mb-4">
+              <h2 className="text-16 font-bold text-scout-text">Veřejné výsledky</h2>
+              <p className="text-12 text-scout-text-muted">
+                Každý závod má vlastní přístupový kód. Sdílej odkaz a kód a kdokoliv uvidí výsledkovou listinu bez přihlášení.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-1.5">
+                <Label>Přístupový kód</Label>
+                <div className="inline-flex items-center rounded-8 border border-scout-border bg-scout-bg-subtle px-3 py-2 font-mono text-18 font-bold tracking-0.5 text-scout-text">
+                  {currentRace.public_code ?? "—"}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRegenerateOpen(true)}
+                disabled={regeneratePublicCode.isPending}
+              >
+                <RefreshCw className="h-4 w-4" /> Přegenerovat kód
+              </Button>
+            </div>
+
+            {currentRace.public_code ? (
+              <div className="mt-4 flex flex-col gap-2 rounded-8 border border-scout-border bg-scout-bg-subtle p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-12 text-scout-text-muted">Odkaz na veřejné výsledky</div>
+                  <div className="truncate text-13 font-medium text-scout-text">
+                    {resultsOrigin ? `${resultsOrigin}/dashboard/results?raceId=${raceId}` : "…"}
+                  </div>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={onCopyResultsLink}>
+                  <Copy className="h-4 w-4" /> Kopírovat odkaz
+                </Button>
+              </div>
+            ) : null}
+          </section>
+
+          <Dialog open={regenerateOpen} onOpenChange={setRegenerateOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Přegenerovat přístupový kód?</DialogTitle>
+                <DialogDescription>
+                  Vytvoří se nový kód a ten současný (<span className="font-mono font-semibold">{currentRace.public_code}</span>) přestane platit. Kdokoliv, komu jsi sdílel starý kód, ztratí přístup k výsledkům.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRegenerateOpen(false)}
+                  disabled={regeneratePublicCode.isPending}
+                >
+                  Zrušit
+                </Button>
+                <Button type="button" onClick={onRegeneratePublicCode} disabled={regeneratePublicCode.isPending}>
+                  <RefreshCw className="h-4 w-4" /> Přegenerovat
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       ) : null}
 
       <Separator />

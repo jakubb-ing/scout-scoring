@@ -21,6 +21,7 @@ defmodule ApiWeb.Router do
     get "/station/races", StationController, :races
     get "/station/races/:race_id/stations", StationController, :stations
     post "/station/login", StationController, :login
+    get "/public/races/:race_id/results", PublicController, :results
   end
 
   scope "/api", ApiWeb do
@@ -43,6 +44,7 @@ defmodule ApiWeb.Router do
     post "/races/:id/activate", RaceController, :activate
     post "/races/:id/reissue_tokens", RaceController, :reissue_tokens
     post "/races/:id/close", RaceController, :close
+    post "/races/:id/regenerate_public_code", RaceController, :regenerate_public_code
     get "/races/:race_id/members", RaceMemberController, :index
     post "/races/:race_id/members", RaceMemberController, :create
     put "/race-members/:id", RaceMemberController, :update

@@ -36,6 +36,19 @@ defmodule Api.Auth.StationToken do
     |> String.pad_leading(6, "0")
   end
 
+  # Unambiguous alphabet: no 0/O/1/I/L so codes are easy to read out loud.
+  @public_code_alphabet ~c"ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+  @doc "Generates a short, human-friendly public results access code."
+  def generate_public_code(length \\ 8) do
+    alphabet = @public_code_alphabet
+    size = length(alphabet)
+
+    Enum.map_join(1..length, "", fn _ ->
+      <<Enum.at(alphabet, :rand.uniform(size) - 1)>>
+    end)
+  end
+
   def generate_nonce do
     :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
   end

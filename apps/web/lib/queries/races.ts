@@ -71,6 +71,17 @@ export function useCloseRace(id: string) {
   });
 }
 
+export function useRegeneratePublicCode(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => RacesApi.regeneratePublicCode(id),
+    onSuccess: (race) => {
+      qc.setQueryData(qk.races.detail(id), race);
+      qc.invalidateQueries({ queryKey: qk.races.all });
+    },
+  });
+}
+
 export function useReissueStationTokens(id: string) {
   const qc = useQueryClient();
   return useMutation({

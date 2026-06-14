@@ -72,7 +72,8 @@ defmodule Api.Races do
         location: attrs["location"],
         owner: organizer_id,
         scoring_model: attrs["scoring_model"] || "sum_points",
-        time_tracking: attrs["time_tracking"] || "none"
+        time_tracking: attrs["time_tracking"] || "none",
+        public_code: StationToken.generate_public_code()
       )
 
     with {:ok, race} <- SurrealDB.one("CREATE race SET #{set};", vars) do
@@ -340,6 +341,63 @@ defmodule Api.Races do
       """,
       %{race: race_id}
     )
+  end
+
+  @doc """
+  All stations for a race with the fields the public results page needs
+  (criteria for the per-station breakdown). No organizer auth — gated by
+  the race's public results code at the controller layer.
+  """
+  def list_stations_public_full(race_id) do
+    SurrealDB.all(
+      """
+      SELECT id, name, position, criteria, allow_half_points
+      FROM station
+      WHERE race = $race
+      ORDER BY position, name;
+      """,
+      %{race: race_id}
+    )
+  end
+
+  @doc """
+  Validates a public results access code against the race. Returns the
+  race's public-safe fields on success. Constant-time comparison guards
+  against timing attacks; an unset/empty code never matches.
+  """
+  def verify_public_results_code(race_id, code) when is_binary(code) and code != "" do
+    case SurrealDB.one("SELECT id, name, public_code FROM $id LIMIT 1;", %{id: race_id}) do
+      {:ok, %{"public_code" => stored} = race} when is_binary(stored) and stored != "" ->
+        if Plug.Crypto.secure_compare(stored, code) do
+          {:ok, Map.take(race, ["id", "name"])}
+        else
+          {:error, :invalid_code}
+        end
+
+      _ ->
+        {:error, :invalid_code}
+    end
+  end
+
+  def verify_public_results_code(_race_id, _code), do: {:error, :invalid_code}
+
+  @doc """
+  Generates a fresh public results access code for a race, invalidating any
+  previously shared one. Owner/edit access required.
+  """
+  def regenerate_public_code(id, organizer_id) do
+    with {:ok, _race} <- ensure_race_edit(id, organizer_id),
+         {:ok, race} when is_map(race) <-
+           SurrealDB.one(
+             "UPDATE $id SET public_code = $code;",
+             %{id: id, code: StationToken.generate_public_code()}
+           ) do
+      AuditLog.log("race.regenerate_public_code", organizer_id, id, id, %{})
+      get_race(race["id"], organizer_id)
+    else
+      {:error, _} = err -> err
+      _ -> {:error, :not_found}
+    end
   end
 
   def create_patrol(race_id, organizer_id, attrs) do

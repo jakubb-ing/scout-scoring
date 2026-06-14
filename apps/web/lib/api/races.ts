@@ -70,6 +70,14 @@ export async function closeRace(id: string): Promise<Race> {
   return mapRaceFromApi(race);
 }
 
+export async function regeneratePublicCode(id: string): Promise<Race> {
+  const race = await apiFetch<ApiRace>(`/api/races/${id}/regenerate_public_code`, {
+    method: "POST",
+    scope: "organizer",
+  });
+  return mapRaceFromApi(race);
+}
+
 export async function reissueStationTokens(id: string): Promise<ReissueTokensPayload> {
   return apiFetch<ReissueTokensPayload>(`/api/races/${id}/reissue_tokens`, {
     method: "POST",

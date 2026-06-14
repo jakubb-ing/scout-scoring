@@ -53,5 +53,13 @@ defmodule ApiWeb.RaceController do
     end
   end
 
+  def regenerate_public_code(conn, %{"id" => id}) do
+    case Races.regenerate_public_code(id, owner(conn)) do
+      {:ok, race} -> json(conn, race)
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> not_found(conn)
+    end
+  end
+
   defp not_found(conn), do: conn |> put_status(404) |> json(%{error: "not_found"})
 end

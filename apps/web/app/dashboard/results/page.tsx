@@ -8,8 +8,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useLeaderboardGroups } from "@/lib/queries/dashboard";
-import { useRace } from "@/lib/queries/races";
+import { ResultsCodeForm } from "@/components/results/results-code-form";
+import { useResultsAccess } from "@/lib/queries/results-access";
 import type { LeaderboardGroup, LeaderboardRow } from "@/lib/api/types";
 
 export default function ResultsPage() {
@@ -24,8 +24,10 @@ function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const raceId = searchParams.get("raceId");
-  const { data: race } = useRace(raceId);
-  const { data: groups = [], isLoading } = useLeaderboardGroups(raceId);
+  const access = useResultsAccess(raceId);
+  const groups = access.data?.leaderboard ?? [];
+  const raceName = access.raceName ?? "Závod";
+  const isLoading = access.mode === "loading";
   const [resultsUrl, setResultsUrl] = React.useState("");
 
   React.useEffect(() => {
@@ -36,11 +38,21 @@ function ResultsContent() {
     window.print();
   }
 
+  if (raceId && access.mode === "needCode") {
+    return (
+      <ResultsCodeForm
+        onSubmit={access.submitCode}
+        error={access.codeError}
+        submitting={access.submitting}
+      />
+    );
+  }
+
   return (
     <>
       {resultsUrl
         ? createPortal(
-            <PrintableResults raceName={race?.name ?? "Závod"} groups={groups} resultsUrl={resultsUrl} />,
+            <PrintableResults raceName={raceName} groups={groups} resultsUrl={resultsUrl} />,
             document.body,
           )
         : null}
@@ -53,7 +65,7 @@ function ResultsContent() {
           </Button>
           <div className="min-w-0 flex-1">
             <div className="text-2xs font-semibold uppercase tracking-0.6 text-scout-text-muted">Výsledky</div>
-            <h1 className="truncate text-18 font-bold text-scout-text">{race?.name ?? "Závod"}</h1>
+            <h1 className="truncate text-18 font-bold text-scout-text">{raceName}</h1>
           </div>
           <Button variant="outline" size="sm" onClick={onExport} disabled={!raceId || isLoading || groups.length === 0}>
             <Download className="h-4 w-4" />
@@ -68,6 +80,8 @@ function ResultsContent() {
             <div className="grid flex-1 place-items-center text-scout-text-muted">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
+          ) : access.mode === "error" ? (
+            <EmptyState title="Nepodařilo se načíst" description="Výsledky se nepodařilo načíst. Zkus to prosím znovu." />
           ) : groups.length === 0 ? (
             <EmptyState title="Žádné výsledky" description="Pro tento závod zatím nejsou dostupné výsledky." />
           ) : (

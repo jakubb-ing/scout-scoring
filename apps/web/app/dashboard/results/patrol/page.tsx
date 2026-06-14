@@ -6,7 +6,8 @@ import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useResults } from "@/lib/queries/dashboard";
+import { ResultsCodeForm } from "@/components/results/results-code-form";
+import { useResultsAccess } from "@/lib/queries/results-access";
 import type { ScoreEntry, Station } from "@/lib/api/types";
 
 export default function PatrolResultsPage() {
@@ -23,12 +24,24 @@ function PatrolResultsContent() {
   const raceId = searchParams.get("raceId");
   const patrolId = searchParams.get("patrolId");
   const [expandedStationId, setExpandedStationId] = React.useState<string | null>(null);
-  const { data, isLoading } = useResults(raceId);
+  const access = useResultsAccess(raceId);
+  const data = access.data;
+  const isLoading = access.mode === "loading";
 
   const patrol = data?.patrols.find((item) => item.id === patrolId) ?? null;
   const categoryName = data && patrol ? getCategoryName(data.leaderboard, patrol.category) : null;
   const stationRows = data && patrolId ? buildStationRows(data.stations, data.score_entries, patrolId) : [];
   const totalPoints = stationRows.reduce((sum, row) => sum + row.points, 0);
+
+  if (raceId && access.mode === "needCode") {
+    return (
+      <ResultsCodeForm
+        onSubmit={access.submitCode}
+        error={access.codeError}
+        submitting={access.submitting}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-scout-bg-app text-scout-text">

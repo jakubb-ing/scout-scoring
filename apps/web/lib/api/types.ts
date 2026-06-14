@@ -27,6 +27,7 @@ export interface Race {
   created_at?: string;
   updated_at?: string;
   access_role?: "owner" | "edit" | "read";
+  public_code?: string | null;
 }
 
 export interface RaceMember {
