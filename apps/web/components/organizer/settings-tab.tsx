@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { NumberStepperInput } from "@/components/ui/number-stepper-input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -38,6 +40,7 @@ import {
 import { usePatrols } from "@/lib/queries/patrols";
 import { useCategories, useCreateCategory, useDeleteCategory } from "@/lib/queries/categories";
 import { useUsers } from "@/lib/queries/auth";
+import type { Race } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/client";
 
 const SCORING_OPTIONS = [
@@ -360,6 +363,8 @@ export function SettingsTab({ raceId }: { raceId: string }) {
         </div>
       </form>
 
+      <FeedbackSettingsCard race={currentRace} readOnly={settingsReadOnly} />
+
       <Separator />
 
       {canManageAccess ? (
@@ -586,6 +591,77 @@ function toTimeModeValue(value: string | null | undefined): TimeModeValue {
   }
 
   return "none";
+}
+
+function FeedbackSettingsCard({ race, readOnly }: { race: Race; readOnly: boolean }) {
+  const updateRace = useUpdateRace(race.id);
+  const enabled = race.feedback_enabled === true;
+
+  async function save(patch: Partial<Race>) {
+    try {
+      await updateRace.mutateAsync(patch);
+    } catch {
+      toast.error("Uložení nastavení zpětné vazby selhalo.");
+    }
+  }
+
+  return (
+    <section className="rounded-12 border border-scout-border bg-white p-5">
+      <div className="mb-4">
+        <h2 className="text-16 font-bold text-scout-text">Zpětná vazba od doprovodu</h2>
+        <p className="text-12 text-scout-text-muted">
+          Doprovod hlídky vyplní slovní hodnocení přes QR kartu hlídky. QR karty
+          se vydávají při přípravě závodu.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-scout-text">Povolit zpětnou vazbu</Label>
+          <Switch
+            checked={enabled}
+            disabled={readOnly || updateRace.isPending}
+            onCheckedChange={(checked) => void save({ feedback_enabled: checked })}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Počet polí „Co se povedlo"</Label>
+            <NumberStepperInput
+              max={10}
+              value={race.feedback_positive_count ?? 3}
+              disabled={readOnly || !enabled || updateRace.isPending}
+              onChange={(e) => void save({ feedback_positive_count: Number(e.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Počet polí „Prostor pro zlepšení"</Label>
+            <NumberStepperInput
+              max={10}
+              value={race.feedback_negative_count ?? 3}
+              disabled={readOnly || !enabled || updateRace.isPending}
+              onChange={(e) => void save({ feedback_negative_count: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-scout-text">Zobrazit ve veřejných výsledcích</Label>
+            <p className="text-12 text-scout-text-muted">
+              Jde o slovní hodnocení dětí — zveřejnění je vypnuté, dokud ho vědomě nezapneš.
+            </p>
+          </div>
+          <Switch
+            checked={race.feedback_public === true}
+            disabled={readOnly || !enabled || updateRace.isPending}
+            onCheckedChange={(checked) => void save({ feedback_public: checked })}
+          />
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function raceStateLabel(state: string) {

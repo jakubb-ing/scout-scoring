@@ -47,6 +47,14 @@ defmodule ApiWeb.PatrolController do
     end
   end
 
+  def reset_feedback_pin(conn, %{"id" => id}) do
+    case Races.reset_patrol_feedback_pin(id, owner(conn)) do
+      {:ok, p} -> json(conn, p)
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> conn |> put_status(404) |> json(%{error: "not_found"})
+    end
+  end
+
   def restore(conn, %{"id" => id}) do
     case Races.restore_patrol(id, owner(conn)) do
       {:ok, p} -> json(conn, p)

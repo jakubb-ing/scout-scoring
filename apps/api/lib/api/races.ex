@@ -95,7 +95,11 @@ defmodule Api.Races do
         held_on: attrs["held_on"],
         location: attrs["location"],
         scoring_model: attrs["scoring_model"],
-        time_tracking: attrs["time_tracking"]
+        time_tracking: attrs["time_tracking"],
+        feedback_enabled: attrs["feedback_enabled"],
+        feedback_positive_count: attrs["feedback_positive_count"],
+        feedback_negative_count: attrs["feedback_negative_count"],
+        feedback_public: attrs["feedback_public"]
       )
 
     vars = Map.merge(vars, %{id: id})
@@ -120,6 +124,7 @@ defmodule Api.Races do
          :ok <- ensure_state(race, "draft", :race_not_draft),
          {:ok, stations} <- list_stations(id, organizer_id),
          {:ok, issued} <- issue_tokens_for(race, stations, :missing_only),
+         :ok <- issue_feedback_pins(id, :missing_only),
          {:ok, prepared_race} when is_map(prepared_race) <-
            SurrealDB.one(
              "UPDATE $id SET state = 'ready', prepared_at = time::now();",
@@ -210,6 +215,62 @@ defmodule Api.Races do
   defp has_issued_credentials?(station) do
     is_binary(station["pin"]) and station["pin"] != "" and
       is_binary(station["access_token_hash"]) and station["access_token_hash"] != ""
+  end
+
+  # PINy hlídek pro zpětnou vazbu doprovodu — vydávají se ve stejném kroku
+  # jako PINy stanovišť a stejně idempotentně (:missing_only).
+  defp issue_feedback_pins(race_id, mode) do
+    with {:ok, patrols} <-
+           SurrealDB.all(
+             "SELECT id, feedback_pin, feedback_nonce FROM patrol WHERE race = $race;",
+             %{race: race_id}
+           ) do
+      Enum.each(patrols, fn patrol ->
+        needs_pin? =
+          mode == :rotate or
+            not (is_binary(patrol["feedback_pin"]) and patrol["feedback_pin"] != "" and
+                   is_binary(patrol["feedback_nonce"]) and patrol["feedback_nonce"] != "")
+
+        if needs_pin? do
+          SurrealDB.query(
+            "UPDATE $id SET feedback_pin = $pin, feedback_nonce = $nonce;",
+            %{
+              id: patrol["id"],
+              pin: StationToken.generate_pin(),
+              nonce: StationToken.generate_nonce()
+            }
+          )
+        end
+      end)
+
+      :ok
+    end
+  end
+
+  @doc """
+  Vydá / resetuje feedback PIN jedné hlídky. Reset rotuje i nonce, takže
+  zneplatní vydané tokeny doprovodu — stejné chování jako u stanovišť.
+  """
+  def reset_patrol_feedback_pin(patrol_id, organizer_id) do
+    with {:ok, patrol} when is_map(patrol) <-
+           SurrealDB.one("SELECT * FROM $id LIMIT 1;", %{id: patrol_id}),
+         {:ok, _race} <- ensure_race_edit(patrol["race"], organizer_id),
+         {:ok, updated} when is_map(updated) <-
+           SurrealDB.one(
+             "UPDATE $id SET feedback_pin = $pin, feedback_nonce = $nonce;",
+             %{
+               id: patrol_id,
+               pin: StationToken.generate_pin(),
+               nonce: StationToken.generate_nonce()
+             }
+           ) do
+      AuditLog.log("patrol.feedback_pin_reset", organizer_id, patrol["race"], patrol_id, %{})
+      {:ok, updated}
+    else
+      {:ok, nil} -> {:error, :not_found}
+      {:error, _} = err -> err
+      _ -> {:error, :not_found}
+    end
   end
 
   def close_race(id, organizer_id) do
@@ -420,10 +481,13 @@ defmodule Api.Races do
   against timing attacks; an unset/empty code never matches.
   """
   def verify_public_results_code(race_id, code) when is_binary(code) and code != "" do
-    case SurrealDB.one("SELECT id, name, public_code FROM $id LIMIT 1;", %{id: race_id}) do
+    case SurrealDB.one(
+           "SELECT id, name, public_code, feedback_public FROM $id LIMIT 1;",
+           %{id: race_id}
+         ) do
       {:ok, %{"public_code" => stored} = race} when is_binary(stored) and stored != "" ->
         if Plug.Crypto.secure_compare(stored, code) do
-          {:ok, Map.take(race, ["id", "name"])}
+          {:ok, Map.take(race, ["id", "name", "feedback_public"])}
         else
           {:error, :invalid_code}
         end
@@ -946,7 +1010,8 @@ defmodule Api.Races do
 
   def authenticate_station_pin(_id, _pin), do: {:error, :invalid_pin}
 
-  defp ensure_race_edit(race_id, organizer_id) do
+  @doc "Owner nebo člen s rolí edit. Veřejné — používá i Api.Feedback/Scoring."
+  def ensure_race_edit(race_id, organizer_id) do
     case race_access(race_id, organizer_id) do
       {:ok, race, role} when role in ["owner", "edit"] -> {:ok, put_access(race, role)}
       {:ok, _race, "read"} -> {:error, :forbidden}

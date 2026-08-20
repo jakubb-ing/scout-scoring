@@ -35,6 +35,14 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
   leaderboard ji vynechá, zápisy zůstávají; badge „nedostavila se".
 - Station login rozlišuje „závod ještě nebyl spuštěn" (409) od špatného
   PINu (401); obrazovka čekání na spuštění s pollingem po 30 s.
+- Zpětná vazba od doprovodu hlídky: offline mobilní stránka
+  `/feedback/[patrolId]` (QR + PIN hlídky), autosave po 5 s, lock
+  s explicitním převzetím mezi zařízeními, uzavření s upozorněním na
+  prázdná pole; okno do `closed_at + 12 h`, reopen adminem ho prodlužuje.
+- Nastavení zpětné vazby v závodě (zapnutí, počty polí 0–10, zveřejnění
+  ve výsledcích — default vypnuto), QR karty pro doprovod v záložce
+  Hlídky, stav odevzdání a „Vrátit k editaci" (obsah admin editovat
+  nemůže, verze textu jsou v audit logu), sekce v detailu hlídky.
 - Prompt „Je k dispozici nová verze" — service worker se vyměňuje až po
   potvrzení, ne uprostřed práce.
 - Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.

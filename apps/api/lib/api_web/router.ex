@@ -13,6 +13,10 @@ defmodule ApiWeb.Router do
     plug ApiWeb.Plugs.AuthenticateStation
   end
 
+  pipeline :feedback_auth do
+    plug ApiWeb.Plugs.AuthenticatePatrolFeedback
+  end
+
   scope "/api", ApiWeb do
     pipe_through :api
 
@@ -21,6 +25,7 @@ defmodule ApiWeb.Router do
     get "/station/races", StationController, :races
     get "/station/races/:race_id/stations", StationController, :stations
     post "/station/login", StationController, :login
+    post "/feedback/login", FeedbackController, :login
     get "/public/races/:race_id/results", PublicController, :results
   end
 
@@ -63,6 +68,10 @@ defmodule ApiWeb.Router do
     delete "/patrols/:id", PatrolController, :delete
     post "/patrols/:id/withdraw", PatrolController, :withdraw
     post "/patrols/:id/restore", PatrolController, :restore
+    post "/patrols/:id/feedback_pin", PatrolController, :reset_feedback_pin
+
+    get "/races/:race_id/feedback", FeedbackAdminController, :index
+    post "/patrol-feedback/:id/reopen", FeedbackAdminController, :reopen
 
     get "/races/:race_id/stations", StationAdminController, :index
     post "/races/:race_id/stations", StationAdminController, :create
@@ -86,5 +95,14 @@ defmodule ApiWeb.Router do
     get "/me", StationController, :me
     get "/scores", StationController, :list_entries
     post "/scores", StationController, :upsert_entry
+  end
+
+  scope "/api/feedback", ApiWeb do
+    pipe_through [:api, :feedback_auth]
+
+    get "/me", FeedbackController, :me
+    put "/draft", FeedbackController, :draft
+    post "/takeover", FeedbackController, :takeover
+    post "/submit", FeedbackController, :submit
   end
 end

@@ -31,6 +31,10 @@ export interface Race {
   closed_at?: string | null;
   access_role?: "owner" | "edit" | "read";
   public_code?: string | null;
+  feedback_enabled?: boolean;
+  feedback_positive_count?: number;
+  feedback_negative_count?: number;
+  feedback_public?: boolean;
 }
 
 export interface RaceMember {
@@ -71,6 +75,7 @@ export interface Patrol {
   withdrawn?: boolean;
   withdrawn_at?: string | null;
   withdrawn_reason?: string | null;
+  feedback_pin?: string | null;
 }
 
 export interface StationCriterion {
@@ -199,6 +204,17 @@ export interface ResultsPayload {
   patrols: Patrol[];
   score_entries: ScoreEntry[];
   leaderboard: LeaderboardGroup[];
+  /** Zpětná vazba doprovodu. Ve veřejné odpovědi jen když race.feedback_public. */
+  patrol_feedback?: PatrolFeedbackResult[] | null;
+}
+
+export interface PatrolFeedbackResult {
+  id: string;
+  patrol: string;
+  positives?: string[];
+  negatives?: string[];
+  state?: "draft" | "submitted";
+  submitted_at?: string | null;
 }
 
 // Station (judge) endpoint types

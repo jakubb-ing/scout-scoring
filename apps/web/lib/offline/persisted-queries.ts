@@ -8,6 +8,8 @@ import type { Query } from "@tanstack/react-query";
 const PERSISTED_KEY_PREFIXES: readonly (readonly string[])[] = [
   // qk.stationMe(id) / qk.stationEntries(id) — viz lib/queries/keys.ts
   ["station", "by-id"],
+  // qk.feedbackMe(id) — offline stránka zpětné vazby doprovodu
+  ["feedback", "by-id"],
 ];
 
 export function shouldPersistQuery(query: Query): boolean {

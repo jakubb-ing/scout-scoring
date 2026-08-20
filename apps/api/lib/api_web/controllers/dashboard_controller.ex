@@ -90,13 +90,15 @@ defmodule ApiWeb.DashboardController do
          {:ok, stations} <- Races.list_stations(rid, owner(conn)),
          {:ok, patrols} <- Races.list_patrols(rid, owner(conn)),
          {:ok, scores} <- Scoring.list_for_race(rid),
-         {:ok, leaderboard} <- Scoring.leaderboard(rid) do
+         {:ok, leaderboard} <- Scoring.leaderboard(rid),
+         {:ok, feedback} <- Api.Feedback.list_records_for_race(rid) do
       json(conn, %{
         race: race,
         stations: stations,
         patrols: patrols,
         score_entries: scores,
-        leaderboard: leaderboard
+        leaderboard: leaderboard,
+        patrol_feedback: feedback
       })
     else
       _ -> conn |> put_status(404) |> json(%{error: "not_found"})

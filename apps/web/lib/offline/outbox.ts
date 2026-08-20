@@ -196,6 +196,16 @@ export async function resumeAuthBlocked(chainKeyPrefix?: string): Promise<void> 
   void flushOutbox();
 }
 
+/** Vrátí `blocked` položky řetězce do fronty (např. po převzetí locku). */
+export async function resumeBlocked(chainKeyPrefix: string): Promise<void> {
+  const blocked = await offlineDb.outbox.where("status").equals("blocked").toArray();
+  const toResume = blocked.filter((i) => i.chainKey.startsWith(chainKeyPrefix));
+  await offlineDb.outbox.bulkUpdate(
+    toResume.map((i) => ({ key: i.id, changes: { status: "pending" as OutboxStatus, attempts: 0 } }))
+  );
+  void flushOutbox();
+}
+
 /** Smaže položky (např. při explicitním odhlášení stanoviště). */
 export async function clearOutbox(chainKeyPrefix?: string): Promise<number> {
   if (!chainKeyPrefix) {

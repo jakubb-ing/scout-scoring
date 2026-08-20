@@ -127,10 +127,68 @@ function PatrolResultsContent() {
                 </table>
               </div>
             </section>
+
+            <PatrolFeedbackSection
+              record={(data.patrol_feedback ?? []).find((f) => f.patrol === patrolId) ?? null}
+            />
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function PatrolFeedbackSection({
+  record,
+}: {
+  record: import("@/lib/api/types").PatrolFeedbackResult | null;
+}) {
+  if (!record) return null;
+
+  if (record.state === "draft") {
+    return (
+      <section className="rounded-12 border border-scout-border bg-white p-3 sm:p-4">
+        <h2 className="text-15 font-bold text-scout-text">Zpětná vazba od doprovodu</h2>
+        <p className="mt-1 text-13 text-scout-text-muted">Rozepsáno, zatím neodevzdáno.</p>
+      </section>
+    );
+  }
+
+  const positives = (record.positives ?? []).filter((v) => v.trim() !== "");
+  const negatives = (record.negatives ?? []).filter((v) => v.trim() !== "");
+  if (positives.length === 0 && negatives.length === 0) return null;
+
+  return (
+    <section className="rounded-12 border border-scout-border bg-white p-3 sm:p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-15 font-bold text-scout-text">Zpětná vazba od doprovodu</h2>
+        {record.submitted_at ? (
+          <span className="text-12 text-scout-text-muted">
+            odevzdáno {new Date(record.submitted_at).toLocaleString("cs-CZ")}
+          </span>
+        ) : null}
+      </div>
+      {positives.length > 0 ? (
+        <div className="mb-3">
+          <div className="mb-1 text-12 font-semibold uppercase tracking-0.5 text-scout-green">Co se povedlo</div>
+          <ul className="list-disc space-y-1 pl-5 text-13 text-scout-text">
+            {positives.map((text, i) => (
+              <li key={i}>{text}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {negatives.length > 0 ? (
+        <div>
+          <div className="mb-1 text-12 font-semibold uppercase tracking-0.5 text-scout-amber">Prostor pro zlepšení</div>
+          <ul className="list-disc space-y-1 pl-5 text-13 text-scout-text">
+            {negatives.map((text, i) => (
+              <li key={i}>{text}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

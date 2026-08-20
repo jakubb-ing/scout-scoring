@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Pencil, Plus, RotateCcw, Trash2, Upload, UserX } from "lucide-react";
+import { createPortal } from "react-dom";
+import { MessageSquare, Pencil, Plus, QrCode, RotateCcw, Trash2, Upload, UserX } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { CategoryBadge } from "@/components/category-badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +36,9 @@ import {
   useWithdrawPatrol,
   useRestorePatrol,
 } from "@/lib/queries/patrols";
-import type { Patrol } from "@/lib/api/types";
+import { useRaceFeedback, useReopenFeedback } from "@/lib/queries/feedback";
+import type { RaceFeedbackRow } from "@/lib/api/feedback";
+import type { Patrol, Race } from "@/lib/api/types";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 export function PatrolsTab({ raceId }: { raceId: string }) {
@@ -48,6 +52,25 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
 
   const [editing, setEditing] = useState<Patrol | null>(null);
   const [open, setOpen] = useState(false);
+  const [feedbackCardsOpen, setFeedbackCardsOpen] = useState(false);
+
+  const feedbackEnabled = race?.feedback_enabled === true;
+  const { data: feedbackRows } = useRaceFeedback(raceId, feedbackEnabled);
+  const reopenFeedback = useReopenFeedback(raceId);
+  const feedbackByPatrol = new Map((feedbackRows ?? []).map((row) => [row.patrol, row]));
+
+  async function onReopenFeedback(p: Patrol, row: RaceFeedbackRow) {
+    const reason = prompt(
+      `Vrátit zpětnou vazbu hlídky ${p.name} k editaci?\n\nDoprovod uvidí původní text a bude ho moci upravit. Uveď důvod:`
+    );
+    if (reason === null) return;
+    try {
+      await reopenFeedback.mutateAsync({ feedbackId: row.id, reason: reason.trim() });
+      toast.success("Zpětná vazba odemčena k editaci.");
+    } catch {
+      toast.error("Odemčení selhalo.");
+    }
+  }
 
   const patrols = patrolsData ?? [];
   const categories = categoriesData ?? [];
@@ -132,6 +155,12 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
             {patrols.length} hlídek · očekává se 10–25 v okresním kole.
           </p>
         </div>
+        {feedbackEnabled ? (
+          <Button variant="outline" onClick={() => setFeedbackCardsOpen(true)} disabled={patrols.length === 0}>
+            <QrCode className="h-4 w-4" />
+            QR pro doprovod
+          </Button>
+        ) : null}
         {canAdd ? (
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -183,8 +212,8 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-scout-bg-table">
-                  {["#", "Název", "Kategorie", "Členové", ""].map((h, i) => (
-                    <th key={`${h}-${i}`} className={`border-b border-scout-border px-3 py-2 text-2xs font-semibold uppercase tracking-0.5 text-scout-text-muted ${i === 4 ? "w-24" : "text-left"}`}>
+                  {["#", "Název", "Kategorie", "Členové", ...(feedbackEnabled ? ["Zpětná vazba"] : []), ""].map((h, i, all) => (
+                    <th key={`${h}-${i}`} className={`border-b border-scout-border px-3 py-2 text-2xs font-semibold uppercase tracking-0.5 text-scout-text-muted ${i === all.length - 1 ? "w-24" : "text-left"}`}>
                       {h}
                     </th>
                   ))}
@@ -213,6 +242,15 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
                     <td className="px-3 py-2.25 text-12 text-scout-text-muted">
                       {(p.members ?? []).length ? `${(p.members ?? []).length} členů` : "—"}
                     </td>
+                    {feedbackEnabled ? (
+                      <td className="px-3 py-2.25 text-12 text-scout-text-muted">
+                        <FeedbackStatusCell
+                          patrol={p}
+                          row={feedbackByPatrol.get(p.id)}
+                          onReopen={onReopenFeedback}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2.25">
                       <div className="flex justify-end gap-1">
                         {canEdit ? (
@@ -252,6 +290,16 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
         </div>
       )}
 
+      {feedbackEnabled ? (
+        <FeedbackCardsDialog
+          open={feedbackCardsOpen}
+          onOpenChange={setFeedbackCardsOpen}
+          patrols={patrols}
+          categories={categories}
+          race={race ?? null}
+        />
+      ) : null}
+
       {canEdit ? (
         <PatrolDialog
           open={open}
@@ -270,6 +318,141 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
 
 function getPatrolCategoryLabel(patrol: Patrol, categories: { id: string; name: string }[]) {
   return categories.find((c) => c.id === patrol.category)?.name ?? patrol.category ?? "—";
+}
+
+function FeedbackStatusCell({
+  patrol,
+  row,
+  onReopen,
+}: {
+  patrol: Patrol;
+  row: RaceFeedbackRow | undefined;
+  onReopen: (p: Patrol, row: RaceFeedbackRow) => void;
+}) {
+  if (!row) return <span>—</span>;
+  if (row.state === "draft") return <span className="text-scout-amber">rozepsáno</span>;
+
+  const time = row.submitted_at
+    ? new Date(row.submitted_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-scout-green">odevzdáno {time}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={() => onReopen(patrol, row)}
+        aria-label="Vrátit k editaci"
+        title="Vrátit k editaci (obsah editovat nejde)"
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+      </Button>
+    </span>
+  );
+}
+
+function FeedbackCardsDialog({
+  open,
+  onOpenChange,
+  patrols,
+  categories,
+  race,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  patrols: Patrol[];
+  categories: { id: string; name: string }[];
+  race: Race | null;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // PINy hlídek vydává prepare_race — před přípravou karty tisknout nejde.
+  const rows = patrols.map((p) => ({
+    ...p,
+    qr_url:
+      p.feedback_pin && mounted
+        ? `${window.location.origin}/feedback/${p.id}?pin=${p.feedback_pin}`
+        : undefined,
+  }));
+
+  const renderCard = (p: Patrol & { qr_url?: string }) => (
+    <div key={p.id} className="login-card flex items-center gap-4 rounded-lg border border-border p-4">
+      {p.qr_url ? (
+        <div className="grid h-32 w-32 shrink-0 place-items-center rounded-md border border-border bg-white p-2 print:h-36 print:w-36">
+          <QRCodeSVG value={p.qr_url} size={112} level="M" marginSize={1} className="print:h-32 print:w-32" />
+        </div>
+      ) : (
+        <div className="grid h-32 w-32 shrink-0 place-items-center rounded-md border border-border bg-secondary text-xs text-muted-foreground print:h-36 print:w-36">
+          <span>QR</span>
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Zpětná vazba · {race?.name ?? ""}
+        </div>
+        <div className="truncate text-base font-semibold">
+          #{p.start_number} {p.name}
+        </div>
+        <div className="text-xs text-muted-foreground">{getPatrolCategoryLabel(p, categories)}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          PIN: <code className="font-mono text-foreground">{p.feedback_pin ?? "—"}</code>
+        </div>
+        {p.qr_url ? (
+          <div className="mt-2 max-w-full break-all font-mono text-[11px] leading-snug text-muted-foreground">
+            {p.qr_url}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const hasPins = patrols.some((p) => p.feedback_pin);
+
+  return (
+    <>
+      {mounted && open
+        ? createPortal(
+            <div id="login-cards-print" className="hidden">
+              {rows.map(renderCard)}
+            </div>,
+            document.body
+          )
+        : null}
+
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>QR karty pro doprovod</DialogTitle>
+            <DialogDescription>
+              Vytiskni a rozdej doprovodu hlídek. Karta obsahuje QR odkaz na
+              formulář zpětné vazby s PINem hlídky.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!hasPins ? (
+            <div className="rounded-md border border-accent/30 bg-accent/10 p-4 text-sm">
+              PINy hlídek se vydají krokem „Připravit ke spuštění" v Přehledu.
+            </div>
+          ) : null}
+
+          <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-1">
+            {rows.map(renderCard)}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
+            <Button onClick={() => window.print()} disabled={!hasPins}>Tisknout</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function PatrolDialog({

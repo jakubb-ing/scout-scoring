@@ -18,7 +18,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
 // appka na slabém signálu visí desítky sekund místo pádu do offline větve.
 const REQUEST_TIMEOUT_MS = 8_000;
 
-export type TokenScope = "organizer" | "station";
+export type TokenScope = "organizer" | "station" | "feedback";
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown, message: string) {
@@ -36,6 +36,7 @@ interface ApiFetchOptions extends Omit<RequestInit, "body"> {
 const STORAGE_KEYS: Record<TokenScope, string> = {
   organizer: "ss.organizer_token",
   station: "ss.station_token",
+  feedback: "ss.feedback_token",
 };
 
 export const tokens = {

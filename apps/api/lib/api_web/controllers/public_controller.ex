@@ -20,12 +20,25 @@ defmodule ApiWeb.PublicController do
          {:ok, patrols} <- Races.list_patrols_public(race_id),
          {:ok, scores} <- Scoring.list_for_race(race_id),
          {:ok, leaderboard} <- Scoring.leaderboard(race_id) do
+      # Slovní hodnocení dětí jde do veřejné odpovědi jen s výslovným
+      # souhlasem organizátora (race.feedback_public, default vypnuto).
+      feedback =
+        if race["feedback_public"] == true do
+          case Api.Feedback.list_submitted_for_race(race_id) do
+            {:ok, records} -> records
+            _ -> []
+          end
+        else
+          nil
+        end
+
       json(conn, %{
         race: race,
         stations: stations,
         patrols: patrols,
         score_entries: scores,
-        leaderboard: leaderboard
+        leaderboard: leaderboard,
+        patrol_feedback: feedback
       })
     else
       {:error, :invalid_code} -> conn |> put_status(401) |> json(%{error: "invalid_code"})

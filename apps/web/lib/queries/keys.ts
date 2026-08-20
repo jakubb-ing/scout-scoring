@@ -25,5 +25,8 @@ export const qk = {
   stationMe: (stationId: string) => ["station", "by-id", stationId, "me"] as const,
   stationEntries: (stationId: string) => ["station", "by-id", stationId, "entries"] as const,
   stationRaces: ["station", "races"] as const,
+  feedbackScope: (patrolId: string) => ["feedback", "by-id", patrolId] as const,
+  feedbackMe: (patrolId: string) => ["feedback", "by-id", patrolId, "me"] as const,
+  raceFeedback: (raceId: string) => ["race-feedback", raceId] as const,
   stationOptions: (raceId: string) => ["station", "races", raceId, "stations"] as const,
 };
