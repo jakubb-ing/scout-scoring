@@ -13,6 +13,12 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", displ
 export const metadata: Metadata = {
   title: "Scout Scoring",
   description: "Bodování skautských závodů bez papíru.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "Scout Scoring",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {

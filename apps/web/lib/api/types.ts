@@ -117,7 +117,18 @@ export interface ScoreEntry {
   created_at?: string;
   updated_at?: string;
   submitted_by?: string;
+  /** Jen lokální (neodeslaný) zápis z outboxu — viz PendingScoreEntry. */
+  _pending?: true;
 }
+
+/**
+ * Lokální zápis čekající v outboxu. `id` je syntetické
+ * (`local:<station>:<patrol>`) — UI hledá záznamy přes `patrol`, ne `id`.
+ */
+export type PendingScoreEntry = Omit<ScoreEntry, "id"> & {
+  id: `local:${string}`;
+  _pending: true;
+};
 
 export interface DashboardPatrolRow {
   id: string;

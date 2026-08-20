@@ -10,7 +10,13 @@
  * can redirect to login / re-scan.
  */
 
+import { reportNetworkFailure, reportNetworkSuccess } from "@/lib/offline/online";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
+
+// Na louce je reálný scénář flaky síť, ne tvrdý offline — bez timeoutu
+// appka na slabém signálu visí desítky sekund místo pádu do offline větve.
+const REQUEST_TIMEOUT_MS = 8_000;
 
 export type TokenScope = "organizer" | "station";
 
@@ -64,17 +70,25 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   const token = tokenOverride ?? (scope ? tokens.get(scope) : null);
   if (token) h.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(url, {
-    ...rest,
-    headers: h,
-    body:
-      body === undefined
-        ? undefined
-        : isFormData
-        ? (body as FormData)
-        : JSON.stringify(body),
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      headers: h,
+      signal: rest.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      body:
+        body === undefined
+          ? undefined
+          : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (err) {
+    reportNetworkFailure();
+    throw err;
+  }
+  reportNetworkSuccess();
 
   if (res.status === 204) return undefined as T;
 

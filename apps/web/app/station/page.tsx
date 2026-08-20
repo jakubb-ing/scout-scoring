@@ -16,9 +16,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveStationRaces, useActiveStations } from "@/lib/queries/station";
+import { tokens } from "@/lib/api/client";
 
 export default function StationEntryPage() {
   const router = useRouter();
+
+  // PWA start_url je /station — s uloženým tokenem přeskočit rovnou na
+  // poslední stanoviště (funguje i offline, kdy select nejde načíst).
+  useEffect(() => {
+    const lastStationId = window.localStorage.getItem("ss.station_last_id");
+    if (lastStationId && tokens.get("station")) {
+      router.replace(`/station/${encodeURIComponent(lastStationId)}`);
+    }
+  }, [router]);
+
   const { data: racesData, isLoading: racesLoading } = useActiveStationRaces();
   const [raceId, setRaceId] = useState("");
   const [stationId, setStationId] = useState("");

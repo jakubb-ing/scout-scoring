@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronRight, CloudUpload, Search } from "lucide-react";
 import { CategoryBadge } from "@/components/category-badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,10 @@ export function PatrolPicker({
 }) {
   const [q, setQ] = useState("");
   const doneIds = useMemo(() => new Set(entries.map((e) => e.patrol)), [entries]);
+  const pendingIds = useMemo(
+    () => new Set(entries.filter((e) => e._pending).map((e) => e.patrol)),
+    [entries]
+  );
   const pointsByPatrol = useMemo(() => {
     const byPatrol = new Map<string, number>();
 
@@ -68,7 +72,7 @@ export function PatrolPicker({
         ))}
         <SectionLabel>Odbaveno ({done.length})</SectionLabel>
         {done.map((p) => (
-          <PatrolRow key={p.id} patrol={p} selected={selectedId === p.id} done points={pointsByPatrol.get(p.id) ?? 0} onSelect={onSelect} />
+          <PatrolRow key={p.id} patrol={p} selected={selectedId === p.id} done pending={pendingIds.has(p.id)} points={pointsByPatrol.get(p.id) ?? 0} onSelect={onSelect} />
         ))}
         {filtered.length === 0 ? (
           <div className="py-8 text-center text-13 text-scout-text-muted">
@@ -88,12 +92,14 @@ function PatrolRow({
   patrol,
   selected,
   done,
+  pending = false,
   points,
   onSelect,
 }: {
   patrol: Patrol;
   selected: boolean;
   done: boolean;
+  pending?: boolean;
   points: number;
   onSelect: (id: string) => void;
 }) {
@@ -103,11 +109,15 @@ function PatrolRow({
       onClick={() => onSelect(patrol.id)}
       className={cn(
         "mb-1.75 flex w-full items-center gap-3 rounded-10 border-1.5 bg-white px-3.5 py-3 text-left transition",
-        done ? "border-scout-green-border opacity-75" : "border-scout-border",
+        done
+          ? pending
+            ? "border-scout-yellow-border opacity-75"
+            : "border-scout-green-border opacity-75"
+          : "border-scout-border",
         selected && "ring-2 ring-scout-blue"
       )}
     >
-      <span className={`grid h-10.5 w-10.5 shrink-0 place-items-center rounded-10 text-16 font-bold tabular-nums text-white ${done ? "bg-scout-green" : "bg-scout-blue"}`}>
+      <span className={`grid h-10.5 w-10.5 shrink-0 place-items-center rounded-10 text-16 font-bold tabular-nums text-white ${done ? (pending ? "bg-scout-yellow text-scout-text" : "bg-scout-green") : "bg-scout-blue"}`}>
         {patrol.start_number}
       </span>
       <span className="min-w-0 flex-1">
@@ -117,10 +127,18 @@ function PatrolRow({
         </span>
       </span>
       {done ? (
-        <span className="inline-flex shrink-0 items-center gap-1 text-12 font-bold text-scout-green">
-          <Check className="h-3.5 w-3.5" />
-          {points} b.
-        </span>
+        pending ? (
+          // Zápis čeká v outboxu na odeslání — jiný odstín než odeslané.
+          <span className="inline-flex shrink-0 items-center gap-1 text-12 font-bold text-scout-text-muted">
+            <CloudUpload className="h-3.5 w-3.5" />
+            {points} b.
+          </span>
+        ) : (
+          <span className="inline-flex shrink-0 items-center gap-1 text-12 font-bold text-scout-green">
+            <Check className="h-3.5 w-3.5" />
+            {points} b.
+          </span>
+        )
       ) : (
         <ChevronRight className="h-4.5 w-4.5 shrink-0 text-scout-text-muted" />
       )}

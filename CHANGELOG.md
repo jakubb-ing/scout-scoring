@@ -18,6 +18,17 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 - Verze aplikace v patičce FE (`AppVersion` — login, dashboard, stanoviště)
   a v odpovědi `GET /api/health`.
 - `make version-show` vypíše verze ze všech tří míst.
+- Offline režim stanoviště: PWA (Serwist, manifest, instalovatelná appka),
+  read cache station dat v IndexedDB (allowlist query keys) a outbox —
+  fronta zápisů bodů v Dexie s dedupe, řetězením a Web Locks flusherem.
+  Zápisy zablokované uzavřením závodu (423) nebo resetem PINu (401) se
+  nezahazují; UI je hlásí a nabízí cestu k nápravě.
+- Indikátor offline stavu a čekajících zápisů v hlavičce stanoviště,
+  odlišení neodeslaných hlídek v seznamu, potvrzovací dialog při odhlášení
+  s neprázdnou frontou.
+- Timeout 8 s v `apiFetch` a sdílená detekce offline (captive portály).
+- Prompt „Je k dispozici nová verze" — service worker se vyměňuje až po
+  potvrzení, ne uprostřed práce.
 - Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.
 - Výsledková stránka uzavřeného závodu s tabulkami po kategoriích.
 - Detail hlídky s body po stanovištích a rozbalením podúkolů/kritérií.

@@ -1,0 +1,23 @@
+{
+  "name": "Scout Scoring",
+  "short_name": "Scout Scoring",
+  "description": "Bodování skautských závodů bez papíru.",
+  "start_url": "/station",
+  "display": "standalone",
+  "background_color": "#101418",
+  "theme_color": "#1d4e89",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

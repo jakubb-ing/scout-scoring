@@ -1,12 +1,24 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import * as StationApi from "@/lib/api/station";
+import { useOfflineMutation } from "@/lib/offline/hooks";
+import type { StationScorePayload } from "@/lib/offline/register";
 import { qk } from "./keys";
 
-export function useStationMe(tokenOverride?: string, enabled = true) {
+// Station data jdou do persistované offline cache (allowlist
+// v lib/offline/persisted-queries.ts) — offlineFirst + delší staleTime,
+// aby se z louky zbytečně nefetchovalo.
+const offlineQueryOptions = {
+  networkMode: "offlineFirst" as const,
+  staleTime: 60_000,
+  gcTime: 72 * 60 * 60 * 1000,
+};
+
+export function useStationMe(stationId: string, tokenOverride?: string, enabled = true) {
   return useQuery({
-    queryKey: [...qk.stationMe, tokenOverride ?? "__stored__"] as const,
+    queryKey: [...qk.stationMe(stationId), tokenOverride ?? "__stored__"] as const,
     queryFn: () => StationApi.getStationMe(tokenOverride),
     enabled,
+    ...offlineQueryOptions,
   });
 }
 
@@ -32,20 +44,15 @@ export function useActiveStations(raceId: string | null | undefined) {
   });
 }
 
-export function useStationEntries(enabled = true) {
+export function useStationEntries(stationId: string, enabled = true) {
   return useQuery({
-    queryKey: qk.stationEntries,
+    queryKey: qk.stationEntries(stationId),
     queryFn: StationApi.listStationEntries,
     enabled,
+    ...offlineQueryOptions,
   });
 }
 
 export function useUpsertScoreEntry() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: StationApi.upsertScoreEntry,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.stationEntries });
-    },
-  });
+  return useOfflineMutation<StationScorePayload>("station.score");
 }

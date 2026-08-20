@@ -19,8 +19,11 @@ export const qk = {
   dashboard: (raceId: string) => ["dashboard", raceId] as const,
   leaderboard: (raceId: string) => ["leaderboard", raceId] as const,
   results: (raceId: string) => ["results", raceId] as const,
-  stationMe: ["station", "me"] as const,
-  stationEntries: ["station", "entries"] as const,
+  // Station keys jsou scoped na stationId — s persistovanou offline cache
+  // by se jinak data z předchozího stanoviště namapovala na nové.
+  stationScope: (stationId: string) => ["station", "by-id", stationId] as const,
+  stationMe: (stationId: string) => ["station", "by-id", stationId, "me"] as const,
+  stationEntries: (stationId: string) => ["station", "by-id", stationId, "entries"] as const,
   stationRaces: ["station", "races"] as const,
   stationOptions: (raceId: string) => ["station", "races", raceId, "stations"] as const,
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, /* Clock, */ Loader2 } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
@@ -13,9 +13,9 @@ import { NumberStepperInput } from "@/components/ui/number-stepper-input";
 import { Switch } from "@/components/ui/switch";
 import { useUpsertScoreEntry } from "@/lib/queries/station";
 import type { Patrol, ScoreEntry, StationCriterion } from "@/lib/api/types";
-import { ApiError } from "@/lib/api/client";
 
 interface Props {
+  stationId: string;
   patrol: Patrol;
   criteria: StationCriterion[];
   allowHalfPoints?: boolean;
@@ -82,7 +82,7 @@ function createScoreFormSchema(criteria: StationCriterion[], allowHalfPoints: bo
     });
 }
 
-export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing, onSaved, onCancel }: Props) {
+export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false, existing, onSaved, onCancel }: Props) {
   const upsert = useUpsertScoreEntry();
   const schema = useMemo(() => createScoreFormSchema(criteria, allowHalfPoints), [allowHalfPoints, criteria]);
   const {
@@ -105,7 +105,7 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
   // Dočasně skryto spolu s blokem „Zaznamenat čas" níže.
   // const withTime = watch("withTime");
   const watchedPoints = useWatch({ control, name: "points" });
-  const submitting = upsert.isPending;
+  const [submitting, setSubmitting] = useState(false);
 
   const total = useMemo(
     () => criteria.reduce((sum, c, index) => sum + (Number(watchedPoints?.[criterionFieldKey(c, index)]) || 0), 0),
@@ -117,14 +117,18 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
   );
 
   async function onSubmit(values: ScoreFormValues) {
+    setSubmitting(true);
     try {
       const scoresPayload = criteria.map((c, index) => ({
         criterion: c.name,
         points: clamp(normalizePointsValue(values.points[criterionFieldKey(c, index)], allowHalfPoints), 0, c.max_points),
       }));
 
+      // Zápis jde do outboxu — resolvne hned, síť řeší flusher na pozadí.
+      // Pro rozhodčího není rozdíl mezi „uloženo" a „uloženo lokálně".
       const today = new Date().toISOString().slice(0, 10);
       await upsert.mutateAsync({
+        stationId,
         patrol_id: patrol.id,
         scores: scoresPayload,
         arrived_at: values.withTime && values.arrivedAt ? `${today}T${values.arrivedAt}:00` : null,
@@ -132,12 +136,10 @@ export function ScoreForm({ patrol, criteria, allowHalfPoints = false, existing,
       });
       toast.success(`Uloženo - ${patrol.name} (${total} b.)`);
       onSaved();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 423) {
-        toast.error("Závod je uzavřen. Nelze upravovat.");
-      } else {
-        toast.error("Uložení selhalo. Zkontroluj signál a zkus znovu.");
-      }
+    } catch {
+      toast.error("Uložení selhalo. Zkus to znovu.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
