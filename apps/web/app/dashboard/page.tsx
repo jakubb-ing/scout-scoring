@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { RaceState } from "@/lib/api/types";
 import { RaceSelector } from "@/components/organizer/race-selector";
 import { OverviewTab } from "@/components/organizer/overview-tab";
 import { PatrolsTab } from "@/components/organizer/patrols-tab";
@@ -251,10 +252,25 @@ function DashboardMobileMenu({
   );
 }
 
-function RaceStatePill({ state }: { state: "draft" | "active" | "closed" }) {
-  const label = state === "active" ? "BĚŽÍ" : state === "closed" ? "UZAVŘENO" : "PŘÍPRAVA";
+function RaceStatePill({ state }: { state: RaceState }) {
+  const label =
+    state === "active"
+      ? "BĚŽÍ"
+      : state === "closed"
+        ? "UZAVŘENO"
+        : state === "ready"
+          ? "PŘIPRAVEN"
+          : "PŘÍPRAVA";
+  const tone =
+    state === "active"
+      ? "bg-scout-green text-white"
+      : state === "ready"
+        ? "bg-scout-yellow text-scout-text"
+        : state === "closed"
+          ? "bg-scout-text-muted text-white"
+          : "bg-scout-bg-subtle text-scout-text";
   return (
-    <span className="rounded-full bg-scout-yellow px-2.25 py-0.75 text-2xs font-bold uppercase tracking-0.5 text-scout-text">
+    <span className={`rounded-full px-2.25 py-0.75 text-2xs font-bold uppercase tracking-0.5 ${tone}`}>
       ● {label}
     </span>
   );

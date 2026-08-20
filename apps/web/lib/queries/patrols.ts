@@ -49,3 +49,20 @@ export function useDeletePatrol(raceId: string) {
     onSuccess: () => invalidatePatrolScope(qc, raceId),
   });
 }
+
+export function useWithdrawPatrol(raceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string | null }) =>
+      PatrolsApi.withdrawPatrol(id, reason),
+    onSuccess: () => invalidatePatrolScope(qc, raceId),
+  });
+}
+
+export function useRestorePatrol(raceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => PatrolsApi.restorePatrol(id),
+    onSuccess: () => invalidatePatrolScope(qc, raceId),
+  });
+}

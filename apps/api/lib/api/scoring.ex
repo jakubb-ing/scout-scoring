@@ -139,8 +139,12 @@ defmodule Api.Scoring do
       scores_by_patrol =
         Enum.group_by(scores, & &1["patrol"])
 
+      # Stažené hlídky do pořadí nepatří — seděly by na konci s nulou.
+      # Jejich score_entry v DB zůstávají (viz Races.withdraw_patrol).
       rows =
-        Enum.map(patrols, fn p ->
+        patrols
+        |> Enum.reject(&(&1["withdrawn"] == true))
+        |> Enum.map(fn p ->
           patrol_scores = Map.get(scores_by_patrol, p["id"], [])
 
           total =

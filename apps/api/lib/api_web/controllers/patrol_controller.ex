@@ -32,6 +32,25 @@ defmodule ApiWeb.PatrolController do
     case Races.update_patrol(id, owner(conn), params) do
       {:ok, p} -> json(conn, p)
       {:error, :race_not_draft} -> conn |> put_status(409) |> json(%{error: "race_not_draft"})
+      {:error, :field_locked} -> conn |> put_status(409) |> json(%{error: "field_locked"})
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> conn |> put_status(404) |> json(%{error: "not_found"})
+    end
+  end
+
+  def withdraw(conn, %{"id" => id} = params) do
+    case Races.withdraw_patrol(id, owner(conn), params["reason"]) do
+      {:ok, p} -> json(conn, p)
+      {:error, :race_not_running} -> conn |> put_status(409) |> json(%{error: "race_not_running"})
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> conn |> put_status(404) |> json(%{error: "not_found"})
+    end
+  end
+
+  def restore(conn, %{"id" => id}) do
+    case Races.restore_patrol(id, owner(conn)) do
+      {:ok, p} -> json(conn, p)
+      {:error, :race_not_running} -> conn |> put_status(409) |> json(%{error: "race_not_running"})
       {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
       _ -> conn |> put_status(404) |> json(%{error: "not_found"})
     end

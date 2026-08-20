@@ -45,6 +45,31 @@ export function useUpdateRace(id: string) {
   });
 }
 
+export function usePrepareRace(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => RacesApi.prepareRace(id),
+    onSuccess: ({ race }) => {
+      qc.setQueryData(qk.races.detail(id), race);
+      qc.invalidateQueries({ queryKey: qk.races.all });
+      qc.invalidateQueries({ queryKey: qk.stations(id) });
+      qc.invalidateQueries({ queryKey: qk.dashboard(id) });
+    },
+  });
+}
+
+export function useUnprepareRace(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => RacesApi.unprepareRace(id),
+    onSuccess: (race) => {
+      qc.setQueryData(qk.races.detail(id), race);
+      qc.invalidateQueries({ queryKey: qk.races.all });
+      qc.invalidateQueries({ queryKey: qk.stations(id) });
+    },
+  });
+}
+
 export function useActivateRace(id: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -13,7 +13,7 @@ export interface LoginResponse {
   organizer: Organizer;
 }
 
-export type RaceState = "draft" | "active" | "closed";
+export type RaceState = "draft" | "ready" | "active" | "closed";
 
 export interface Race {
   id: string;
@@ -26,6 +26,9 @@ export interface Race {
   time_tracking?: "none" | "per_station" | "start_finish" | string;
   created_at?: string;
   updated_at?: string;
+  prepared_at?: string | null;
+  activated_at?: string | null;
+  closed_at?: string | null;
   access_role?: "owner" | "edit" | "read";
   public_code?: string | null;
 }
@@ -65,6 +68,9 @@ export interface Patrol {
   category_name?: string | null;
   members?: string[];
   selfservice_code?: string | null;
+  withdrawn?: boolean;
+  withdrawn_at?: string | null;
+  withdrawn_reason?: string | null;
 }
 
 export interface StationCriterion {
@@ -207,10 +213,11 @@ export interface StationMePayload {
   patrols: Patrol[];
 }
 
-// Shape the BE returns on /races/:id/activate — loose on purpose, FE renders what's present.
+// Shape the BE returns on /races/:id/prepare (PINs issued) and
+// /races/:id/activate (state change only, no stations) — loose on purpose.
 export interface ActivationPayload {
   race: Race;
-  stations: (Station & { access_token_raw?: string })[];
+  stations?: (Station & { access_token_raw?: string })[];
 }
 
 // AI import (POST /api/races/:race_id/ai-import/*).

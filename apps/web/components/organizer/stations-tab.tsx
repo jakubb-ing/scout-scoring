@@ -27,7 +27,7 @@ import {
   useDeactivateStation,
   useResetStationPin,
 } from "@/lib/queries/stations";
-import type { Station, StationCriterion } from "@/lib/api/types";
+import type { RaceState, Station, StationCriterion } from "@/lib/api/types";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AiImportDialog } from "./ai-import-dialog";
 
@@ -49,9 +49,12 @@ export function StationsTab({ raceId }: { raceId: string }) {
   const [aiImportOpen, setAiImportOpen] = useState(false);
 
   const stations = stationsData ?? [];
+  // Přidávání/mazání jen v draftu; editace definice (kritéria, název…)
+  // i v ready — QR nese jen id + PIN, tisk zůstává platný.
   const canModify = race?.state === "draft" && race.access_role !== "read";
   const canEdit = race?.access_role !== "read";
-  const canEditDefinition = canModify;
+  const canEditDefinition =
+    race != null && race.access_role !== "read" && (race.state === "draft" || race.state === "ready");
 
   async function onToggleActive(s: Station) {
     const message = s.is_active
@@ -122,7 +125,7 @@ export function StationsTab({ raceId }: { raceId: string }) {
           description={
             canModify
               ? "Založ stanoviště s kritérii bodování. Spustit závod půjde, až bude aspoň jedno."
-              : `Závod je ${race.state === "active" ? "spuštěný" : "uzavřený"} — nová stanoviště už nejdou přidat.`
+              : "Nová stanoviště jdou přidat jen v přípravě závodu."
           }
           action={
             canModify ? (
@@ -166,7 +169,7 @@ export function StationsTab({ raceId }: { raceId: string }) {
                           variant="ghost"
                           size="icon"
                           onClick={() => onResetPin(s)}
-                          disabled={resetPin.isPending || race.state !== "active"}
+                          disabled={resetPin.isPending || (race.state !== "active" && race.state !== "ready")}
                           aria-label="Restartovat PIN"
                           title="Restartovat PIN"
                         >
@@ -401,7 +404,7 @@ function LoginCardsDialog({
   stations: Station[];
   raceId: string;
   raceName: string;
-  raceState: "draft" | "active" | "closed";
+  raceState: RaceState;
   canReissue: boolean;
 }) {
   // QR URLs carry only station id + PIN. The judge-facing page exchanges
@@ -505,7 +508,7 @@ function LoginCardsDialog({
 
         {raceState === "draft" ? (
           <div className="rounded-md border border-accent/30 bg-accent/10 p-4 text-sm">
-            Závod ještě neběží. Po spuštění závodu dostaneš jednorázové tokeny, které jsou teď skryté.
+            Závod je v přípravě. PINy a QR kódy se vydají krokem „Připravit ke spuštění" v Přehledu.
           </div>
         ) : null}
         {!canReissue && raceState !== "draft" ? (

@@ -188,7 +188,12 @@ export function SettingsTab({ raceId }: { raceId: string }) {
 
   const currentRace = race;
   const readOnlyAccess = race.access_role === "read";
-  const readOnly = race.state !== "draft" || readOnlyAccess;
+  // Strukturální nastavení (model bodování, měření času, kategorie) se
+  // zamyká už v ready; název/datum/místo jdou ladit až do spuštění.
+  const structuralReadOnly = race.state !== "draft" || readOnlyAccess;
+  const settingsReadOnly =
+    (race.state !== "draft" && race.state !== "ready") || readOnlyAccess;
+  const readOnly = structuralReadOnly;
   const categories = categoriesData ?? [];
   const patrols = patrolsData ?? [];
   const users = usersData ?? [];
@@ -275,7 +280,11 @@ export function SettingsTab({ raceId }: { raceId: string }) {
           {readOnlyAccess ? (
             <>Máš přístup jen pro čtení. Editace závodu je uzamčena.</>
           ) : (
-            <>Závod je ve stavu <Badge variant="default" className="mx-1">{race.state}</Badge>. Některá pole jsou uzamčena.</>
+            <>
+              Závod je ve stavu
+              <Badge variant="default" className="mx-1">{raceStateLabel(race.state)}</Badge>.
+              Některá pole jsou uzamčena.
+            </>
           )}
         </div>
       ) : null}
@@ -288,16 +297,16 @@ export function SettingsTab({ raceId }: { raceId: string }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="sname">Název</Label>
-            <Input id="sname" {...registerSettings("name")} disabled={readOnly} />
+            <Input id="sname" {...registerSettings("name")} disabled={settingsReadOnly} />
             <FieldError message={settingsFormState.errors.name?.message} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="sdate">Datum</Label>
-            <Input id="sdate" type="date" {...registerSettings("date")} disabled={readOnly} />
+            <Input id="sdate" type="date" {...registerSettings("date")} disabled={settingsReadOnly} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="sloc">Místo</Label>
-            <Input id="sloc" {...registerSettings("location")} disabled={readOnly} />
+            <Input id="sloc" {...registerSettings("location")} disabled={settingsReadOnly} />
           </div>
         </div>
 
@@ -347,7 +356,7 @@ export function SettingsTab({ raceId }: { raceId: string }) {
         </div>
 
         <div>
-          <Button type="submit" disabled={readOnly || updateRace.isPending}>Uložit nastavení</Button>
+          <Button type="submit" disabled={settingsReadOnly || updateRace.isPending}>Uložit nastavení</Button>
         </div>
       </form>
 
@@ -577,4 +586,19 @@ function toTimeModeValue(value: string | null | undefined): TimeModeValue {
   }
 
   return "none";
+}
+
+function raceStateLabel(state: string) {
+  switch (state) {
+    case "draft":
+      return "příprava";
+    case "ready":
+      return "připraven ke spuštění";
+    case "active":
+      return "spuštěný";
+    case "closed":
+      return "uzavřený";
+    default:
+      return state;
+  }
 }

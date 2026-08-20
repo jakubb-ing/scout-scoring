@@ -32,6 +32,21 @@ defmodule ApiWeb.StationController do
           }
         })
 
+      {:error, {:race_not_started, station}} ->
+        conn
+        |> put_status(409)
+        |> json(%{
+          error: "race_not_started",
+          race_name: station["race_name"],
+          station_name: station["name"],
+          state: station["race_state"]
+        })
+
+      {:error, :race_closed} ->
+        conn
+        |> put_status(409)
+        |> json(%{error: "race_closed"})
+
       {:error, _} ->
         conn
         |> put_status(401)

@@ -54,6 +54,25 @@ export async function updateRace(id: string, data: Partial<Race>): Promise<Race>
   return mapRaceFromApi(race);
 }
 
+export async function prepareRace(id: string): Promise<ActivationPayload> {
+  const payload = await apiFetch<ActivationPayload & { race: ApiRace }>(`/api/races/${id}/prepare`, {
+    method: "POST",
+    scope: "organizer",
+  });
+  return {
+    ...payload,
+    race: mapRaceFromApi(payload.race),
+  };
+}
+
+export async function unprepareRace(id: string): Promise<Race> {
+  const race = await apiFetch<ApiRace>(`/api/races/${id}/unprepare`, {
+    method: "POST",
+    scope: "organizer",
+  });
+  return mapRaceFromApi(race);
+}
+
 export async function activateRace(id: string): Promise<ActivationPayload> {
   const payload = await apiFetch<ActivationPayload & { race: ApiRace }>(`/api/races/${id}/activate`, {
     method: "POST",

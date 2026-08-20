@@ -110,53 +110,106 @@ defmodule Api.Races do
     end
   end
 
+  @doc """
+  draft → ready. Vydá chybějící PINy (`:missing_only` — opakovaný průchod
+  draft → ready → draft → ready nesmí zneplatnit vytištěné QR kódy)
+  a aktivuje stanoviště. QR kódy se tisknou právě v tomhle stavu.
+  """
+  def prepare_race(id, organizer_id) do
+    with {:ok, race} <- ensure_race_edit(id, organizer_id),
+         :ok <- ensure_state(race, "draft", :race_not_draft),
+         {:ok, stations} <- list_stations(id, organizer_id),
+         {:ok, issued} <- issue_tokens_for(race, stations, :missing_only),
+         {:ok, prepared_race} when is_map(prepared_race) <-
+           SurrealDB.one(
+             "UPDATE $id SET state = 'ready', prepared_at = time::now();",
+             %{id: id}
+           ) do
+      AuditLog.log("race.prepare", organizer_id, id, id, %{})
+      {:ok, Map.put(issued, :race, put_access(prepared_race, race["access_role"]))}
+    end
+  end
+
+  @doc """
+  ready → draft. PINy nechává být — vytištěné QR kódy zůstávají v platnosti;
+  `is_active` se vrací na false zrcadlově k `prepare_race`.
+  """
+  def unprepare_race(id, organizer_id) do
+    with {:ok, race} <- ensure_race_edit(id, organizer_id),
+         :ok <- ensure_state(race, "ready", :race_not_ready),
+         {:ok, updated} when is_map(updated) <-
+           SurrealDB.one("UPDATE $id SET state = 'draft';", %{id: id}) do
+      SurrealDB.query(
+        "UPDATE station SET is_active = false WHERE race = $race;",
+        %{race: id}
+      )
+
+      AuditLog.log("race.unprepare", organizer_id, id, id, %{})
+      {:ok, put_access(updated, race["access_role"])}
+    end
+  end
+
+  @doc "ready → active. Tokeny už vydal `prepare_race` — tady se jen mění stav."
   def activate_race(id, organizer_id) do
     with {:ok, race} <- ensure_race_edit(id, organizer_id),
-         {:ok, stations} <- list_stations(id, organizer_id),
-         {:ok, issued} <- issue_tokens_for(race, stations),
-         {:ok, activated_race} <-
+         :ok <- ensure_state(race, "ready", :race_not_ready),
+         {:ok, activated_race} when is_map(activated_race) <-
            SurrealDB.one(
              "UPDATE $id SET state = 'active', activated_at = time::now();",
              %{id: id}
            ) do
       AuditLog.log("race.activate", organizer_id, id, id, %{})
-      {:ok, Map.put(issued, :race, put_access(activated_race, race["access_role"]))}
+      {:ok, %{race: put_access(activated_race, race["access_role"])}}
     end
   end
 
   @doc """
-  Re-issues fresh station tokens and PINs for every station on an
-  already-active race. Rotating invalidates any previously-printed QR
-  codes — that's the feature, not a bug. QR URLs are built client-side
-  from the frontend's own origin.
+  Re-issues fresh station tokens and PINs for every station on the race.
+  Rotating invalidates any previously-printed QR codes — that's the
+  feature, not a bug. QR URLs are built client-side from the frontend's
+  own origin.
   """
   def reissue_station_tokens(race_id, organizer_id) do
     with {:ok, race} <- ensure_race_edit(race_id, organizer_id),
          {:ok, stations} <- list_stations(race_id, organizer_id),
-         {:ok, issued} <- issue_tokens_for(race, stations) do
+         {:ok, issued} <- issue_tokens_for(race, stations, :rotate) do
       AuditLog.log("race.reissue_tokens", organizer_id, race_id, race_id, %{})
       {:ok, issued}
     end
   end
 
-  defp issue_tokens_for(%{"id" => race_id}, stations) do
+  # :missing_only — vydá PIN jen stanovišti, které ho ještě nemá (prepare_race).
+  # :rotate      — přegeneruje všem (reissue_station_tokens, invalidace je záměr).
+  defp issue_tokens_for(%{"id" => race_id}, stations, mode)
+       when mode in [:missing_only, :rotate] do
     updated =
       Enum.map(stations, fn %{"id" => sid} = station ->
-        pin = StationToken.generate_pin()
-        nonce = StationToken.generate_nonce()
+        if mode == :missing_only and has_issued_credentials?(station) do
+          SurrealDB.query("UPDATE $id SET is_active = true;", %{id: sid})
+          Map.put(station, "is_active", true)
+        else
+          pin = StationToken.generate_pin()
+          nonce = StationToken.generate_nonce()
 
-        SurrealDB.query(
-          "UPDATE $id SET access_token_hash = $nonce, pin = $pin, is_active = true;",
-          %{id: sid, pin: pin, nonce: nonce}
-        )
+          SurrealDB.query(
+            "UPDATE $id SET access_token_hash = $nonce, pin = $pin, is_active = true;",
+            %{id: sid, pin: pin, nonce: nonce}
+          )
 
-        Map.merge(station, %{
-          "pin" => pin,
-          "access_token_hash" => nonce
-        })
+          Map.merge(station, %{
+            "pin" => pin,
+            "access_token_hash" => nonce,
+            "is_active" => true
+          })
+        end
       end)
 
     {:ok, %{race_id: race_id, stations: updated}}
+  end
+
+  defp has_issued_credentials?(station) do
+    is_binary(station["pin"]) and station["pin"] != "" and
+      is_binary(station["access_token_hash"]) and station["access_token_hash"] != ""
   end
 
   def close_race(id, organizer_id) do
@@ -313,8 +366,9 @@ defmodule Api.Races do
 
   def list_patrols_public(race_id) do
     # Used by station clients: only minimal fields, no organizer auth needed.
+    # Stažené hlídky se rozhodčím nenabízejí — nedostavily se.
     SurrealDB.all(
-      "SELECT id, start_number, name, category, category.name AS category_name FROM patrol WHERE race = $race ORDER BY start_number;",
+      "SELECT id, start_number, name, category, category.name AS category_name FROM patrol WHERE race = $race AND withdrawn != true ORDER BY start_number;",
       %{race: race_id}
     )
   end
@@ -448,14 +502,39 @@ defmodule Api.Races do
   def update_patrol(id, organizer_id, attrs) do
     with {:ok, patrol} when is_map(patrol) <-
            SurrealDB.one("SELECT * FROM $id LIMIT 1;", %{id: id}),
-         {:ok, _race} <- ensure_race_draft_edit(patrol["race"], organizer_id) do
+         {:ok, race} <- ensure_race_setup_edit(patrol["race"], organizer_id),
+         {:ok, attrs} <- restrict_patrol_attrs(race, patrol, attrs) do
       do_update_patrol(id, attrs)
     else
       {:ok, nil} -> {:error, :not_found}
       {:error, :race_not_draft} = err -> err
+      {:error, :field_locked} = err -> err
       {:error, :forbidden} = err -> err
       {:error, {:surreal, _}} = err -> err
       _ -> {:error, :not_found}
+    end
+  end
+
+  # V `ready` smí projít jen name + members — start_number a kategorie mění
+  # zařazení ve výsledcích a startovní číslo je vytištěné na kartách.
+  # Pokus o změnu zamčeného pole je chyba, ne tiché ignorování. Filtr žije
+  # v kontextu, ať ho nejde obejít jiným endpointem.
+  defp restrict_patrol_attrs(%{"state" => "draft"}, _patrol, attrs), do: {:ok, attrs}
+
+  defp restrict_patrol_attrs(%{"state" => "ready"}, patrol, attrs) do
+    start_number_changed? =
+      Map.has_key?(attrs, "start_number") and attrs["start_number"] != patrol["start_number"]
+
+    category_changed? =
+      Map.has_key?(attrs, "category") and attrs["category"] != patrol["category"]
+
+    if start_number_changed? or category_changed? do
+      {:error, :field_locked}
+    else
+      {:ok,
+       attrs
+       |> Map.put("start_number", patrol["start_number"])
+       |> Map.put("category", patrol["category"])}
     end
   end
 
@@ -475,6 +554,52 @@ defmodule Api.Races do
       name: attrs["name"],
       members: attrs["members"] || []
     })
+  end
+
+  @doc """
+  Stažení nedostavené hlídky (ready | active) — místo mazání. Body ani
+  zpětná vazba se nemažou; leaderboard hlídku vynechá.
+  """
+  def withdraw_patrol(id, organizer_id, reason) do
+    with {:ok, patrol} when is_map(patrol) <-
+           SurrealDB.one("SELECT * FROM $id LIMIT 1;", %{id: id}),
+         {:ok, race} <- ensure_race_edit(patrol["race"], organizer_id),
+         :ok <- ensure_state_in(race, ["ready", "active"], :race_not_running),
+         {:ok, updated} when is_map(updated) <-
+           SurrealDB.one(
+             "UPDATE $id SET withdrawn = true, withdrawn_at = time::now(), withdrawn_reason = $reason;",
+             %{id: id, reason: reason}
+           ) do
+      AuditLog.log("patrol.withdraw", organizer_id, patrol["race"], id, %{
+        name: patrol["name"],
+        reason: reason
+      })
+
+      {:ok, updated}
+    else
+      {:ok, nil} -> {:error, :not_found}
+      {:error, _} = err -> err
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def restore_patrol(id, organizer_id) do
+    with {:ok, patrol} when is_map(patrol) <-
+           SurrealDB.one("SELECT * FROM $id LIMIT 1;", %{id: id}),
+         {:ok, race} <- ensure_race_edit(patrol["race"], organizer_id),
+         :ok <- ensure_state_in(race, ["ready", "active"], :race_not_running),
+         {:ok, updated} when is_map(updated) <-
+           SurrealDB.one(
+             "UPDATE $id SET withdrawn = false, withdrawn_at = NONE, withdrawn_reason = NONE;",
+             %{id: id}
+           ) do
+      AuditLog.log("patrol.restore", organizer_id, patrol["race"], id, %{name: patrol["name"]})
+      {:ok, updated}
+    else
+      {:ok, nil} -> {:error, :not_found}
+      {:error, _} = err -> err
+      _ -> {:error, :not_found}
+    end
   end
 
   def delete_patrol(id, organizer_id) do
@@ -548,7 +673,9 @@ defmodule Api.Races do
   def update_station(id, organizer_id, attrs) do
     case SurrealDB.one("SELECT * FROM $id LIMIT 1;", %{id: id}) do
       {:ok, station} when is_map(station) ->
-        with {:ok, _race} <- ensure_race_draft_edit(station["race"], organizer_id) do
+        # V `ready` je editace stanoviště povolená celá — QR nese jen
+        # id + PIN, takže vytištěné karty zůstávají v platnosti.
+        with {:ok, _race} <- ensure_race_setup_edit(station["race"], organizer_id) do
           do_update_station(id, attrs)
         end
 
@@ -745,7 +872,7 @@ defmodule Api.Races do
       access_token_hash = $nonce,
       pin = $pin,
       is_active = true
-    WHERE race.state = 'active';
+    WHERE race.state IN ['ready', 'active'];
     """
 
     with {:ok, station} when is_map(station) <-
@@ -766,12 +893,23 @@ defmodule Api.Races do
     end
   end
 
-  @doc "Lookup a station by id, only if active and race not closed. Used by station-auth plug."
+  @doc "Lookup a station by id, only if active and race running. Used by station-auth plug."
   def get_active_station(id) do
+    case get_station_for_login(id) do
+      {:ok, %{"race_state" => "active"} = station} -> {:ok, station}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Lookup bez filtru na stav závodu — vrací i `race_state` a `race_name`,
+  aby login/plug uměly odlišit „závod neběží" od „špatný PIN".
+  """
+  def get_station_for_login(id) do
     sql = """
-    SELECT *, race.state AS race_state
+    SELECT *, race.state AS race_state, race.name AS race_name
     FROM $id
-    WHERE is_active = true AND race.state = 'active'
+    WHERE is_active = true
     LIMIT 1;
     """
 
@@ -782,11 +920,27 @@ defmodule Api.Races do
   end
 
   def authenticate_station_pin(id, pin) when is_binary(pin) do
-    with {:ok, station} <- get_active_station(id),
-         true <- station["pin"] == pin do
-      {:ok, station}
-    else
-      _ -> {:error, :invalid_pin}
+    case get_station_for_login(id) do
+      {:ok, station} ->
+        cond do
+          # Stav se kontroluje před PINem — rozhodčí se správným PINem
+          # v `ready` nesmí dostat „špatný PIN". Odpověď nese jen stav,
+          # PIN se v těchhle větvích neověřuje ani nepotvrzuje.
+          station["race_state"] in ["draft", "ready"] ->
+            {:error, {:race_not_started, station}}
+
+          station["race_state"] == "closed" ->
+            {:error, :race_closed}
+
+          station["pin"] == pin ->
+            {:ok, station}
+
+          true ->
+            {:error, :invalid_pin}
+        end
+
+      _ ->
+        {:error, :invalid_pin}
     end
   end
 
@@ -800,12 +954,29 @@ defmodule Api.Races do
     end
   end
 
+  # Přidávání a mazání entit — pouze v draftu.
   defp ensure_race_draft_edit(race_id, organizer_id) do
     case ensure_race_edit(race_id, organizer_id) do
       {:ok, %{"state" => "draft"} = race} -> {:ok, race}
       {:ok, _race} -> {:error, :race_not_draft}
       err -> err
     end
+  end
+
+  # Editace existujících entit — draft i ready (doladění po tisku QR).
+  defp ensure_race_setup_edit(race_id, organizer_id) do
+    case ensure_race_edit(race_id, organizer_id) do
+      {:ok, %{"state" => state} = race} when state in ["draft", "ready"] -> {:ok, race}
+      {:ok, _race} -> {:error, :race_not_draft}
+      err -> err
+    end
+  end
+
+  defp ensure_state(%{"state" => state}, state, _error), do: :ok
+  defp ensure_state(_race, _state, error), do: {:error, error}
+
+  defp ensure_state_in(%{"state" => state}, states, error) do
+    if state in states, do: :ok, else: {:error, error}
   end
 
   defp race_access(race_id, organizer_id) do

@@ -41,6 +41,8 @@ defmodule ApiWeb.Router do
     post "/races", RaceController, :create
     get "/races/:id", RaceController, :show
     put "/races/:id", RaceController, :update
+    post "/races/:id/prepare", RaceController, :prepare
+    post "/races/:id/unprepare", RaceController, :unprepare
     post "/races/:id/activate", RaceController, :activate
     post "/races/:id/reissue_tokens", RaceController, :reissue_tokens
     post "/races/:id/close", RaceController, :close
@@ -59,6 +61,8 @@ defmodule ApiWeb.Router do
     post "/races/:race_id/patrols/bulk", PatrolController, :bulk_create
     put "/patrols/:id", PatrolController, :update
     delete "/patrols/:id", PatrolController, :delete
+    post "/patrols/:id/withdraw", PatrolController, :withdraw
+    post "/patrols/:id/restore", PatrolController, :restore
 
     get "/races/:race_id/stations", StationAdminController, :index
     post "/races/:race_id/stations", StationAdminController, :create

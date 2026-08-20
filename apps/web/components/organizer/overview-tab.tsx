@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useRace, useActivateRace, useCloseRace } from "@/lib/queries/races";
+import { useRace, useActivateRace, useCloseRace, usePrepareRace, useUnprepareRace } from "@/lib/queries/races";
 import { useDashboard, useLeaderboardGroups } from "@/lib/queries/dashboard";
 import type { DashboardActivityRow, DashboardPatrolRow, DashboardStationRow } from "@/lib/api/types";
 import { fromNowFormat } from "@/lib/utils";
@@ -17,23 +17,54 @@ export function OverviewTab({ raceId }: { raceId: string }) {
   const { isLoading: leaderboardLoading } = useLeaderboardGroups(raceId, {
     refetchInterval: 10_000,
   });
+  const prepare = usePrepareRace(raceId);
+  const unprepare = useUnprepareRace(raceId);
   const activate = useActivateRace(raceId);
   const close = useCloseRace(raceId);
 
   const payload = dashboardData ?? null;
   const loading = leaderboardLoading;
 
+  async function onPrepare() {
+    if (!confirm("Připravit závod ke spuštění? Vydají se PINy a QR kódy pro stanoviště — v tabu Stanoviště je pak můžeš vytisknout.")) return;
+    try {
+      await prepare.mutateAsync();
+      toast.success("Závod připraven. QR kódy najdeš v tabu Stanoviště.");
+    } catch {
+      toast.error("Příprava selhala.");
+    }
+  }
+
+  async function onUnprepare() {
+    if (!confirm("Vrátit závod do přípravy? Vytištěné QR kódy zůstávají v platnosti — PINy se nemění.")) return;
+    try {
+      await unprepare.mutateAsync();
+      toast.success("Závod vrácen do přípravy.");
+    } catch {
+      toast.error("Návrat do přípravy selhal.");
+    }
+  }
+
   async function onActivate() {
     try {
       await activate.mutateAsync();
-      toast.success("Závod spuštěn. Login Cards najdeš v tabu Stanoviště.");
+      toast.success("Závod spuštěn.");
     } catch {
       toast.error("Aktivace selhala.");
     }
   }
 
   async function onClose() {
-    if (!confirm("Opravdu uzavřít závod? Rozhodčí už nebudou moci editovat.")) return;
+    // Uzavření je nevratné a má důsledky — vyjmenovat je, ne jen „opravdu?".
+    if (
+      !confirm(
+        "Opravdu uzavřít závod? Uzavření je nevratné:\n\n" +
+          "• rozhodčí už nebudou moci zapisovat body,\n" +
+          "• neodeslané offline zápisy zůstanou zablokované,\n" +
+          "• body půjde upravit už jen přes opravy s uvedením důvodu."
+      )
+    )
+      return;
     try {
       await close.mutateAsync();
       toast.success("Závod uzavřen.");
@@ -58,7 +89,13 @@ export function OverviewTab({ raceId }: { raceId: string }) {
     <div className="flex h-full min-h-0 flex-col gap-2.5 sm:gap-3.5">
       <div className="flex shrink-0 justify-end gap-2">
         {race.state === "draft" ? (
-          <Button onClick={onActivate} disabled={activate.isPending}>Spustit závod</Button>
+          <Button onClick={onPrepare} disabled={prepare.isPending}>Připravit ke spuštění</Button>
+        ) : null}
+        {race.state === "ready" ? (
+          <>
+            <Button variant="outline" onClick={onUnprepare} disabled={unprepare.isPending}>Zpět do přípravy</Button>
+            <Button onClick={onActivate} disabled={activate.isPending}>Spustit závod</Button>
+          </>
         ) : null}
         {race.state === "active" ? (
           <Button variant="outline" onClick={onClose} disabled={close.isPending}>Uzavřít závod</Button>

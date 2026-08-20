@@ -24,6 +24,7 @@ import { FormEvent, useState } from "react";
 function stateBadge(state: Race["state"]) {
   const map: Record<Race["state"], { label: string; variant: "secondary" | "default" | "muted" }> = {
     draft: { label: "Rozpracováno", variant: "muted" },
+    ready: { label: "Připraven", variant: "secondary" },
     active: { label: "Běží", variant: "default" },
     closed: { label: "Uzavřeno", variant: "secondary" },
   };

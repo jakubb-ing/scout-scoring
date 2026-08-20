@@ -27,6 +27,14 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
   odlišení neodeslaných hlídek v seznamu, potvrzovací dialog při odhlášení
   s neprázdnou frontou.
 - Timeout 8 s v `apiFetch` a sdílená detekce offline (captive portály).
+- Nový stav závodu `ready` (draft → ready → active → closed, návrat
+  ready → draft): `prepare` vydá PINy a QR idempotentně (`:missing_only`),
+  tisk karet se odemyká už v `ready`, editace hlídek je omezená na název
+  a členy (`field_locked`), stanoviště jdou upravovat celá.
+- Stažení nedostavené hlídky (`withdraw`/`restore`) místo mazání —
+  leaderboard ji vynechá, zápisy zůstávají; badge „nedostavila se".
+- Station login rozlišuje „závod ještě nebyl spuštěn" (409) od špatného
+  PINu (401); obrazovka čekání na spuštění s pollingem po 30 s.
 - Prompt „Je k dispozici nová verze" — service worker se vyměňuje až po
   potvrzení, ne uprostřed práce.
 - Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.

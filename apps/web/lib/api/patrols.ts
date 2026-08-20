@@ -36,3 +36,15 @@ export async function updatePatrol(id: string, data: Partial<Patrol>): Promise<P
 export async function deletePatrol(id: string): Promise<void> {
   await apiFetch<void>(`/api/patrols/${id}`, { method: "DELETE", scope: "organizer" });
 }
+
+export async function withdrawPatrol(id: string, reason: string | null): Promise<Patrol> {
+  return apiFetch<Patrol>(`/api/patrols/${id}/withdraw`, {
+    method: "POST",
+    scope: "organizer",
+    body: { reason },
+  });
+}
+
+export async function restorePatrol(id: string): Promise<Patrol> {
+  return apiFetch<Patrol>(`/api/patrols/${id}/restore`, { method: "POST", scope: "organizer" });
+}

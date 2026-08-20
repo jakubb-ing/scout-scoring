@@ -31,9 +31,29 @@ defmodule ApiWeb.RaceController do
     end
   end
 
+  def prepare(conn, %{"id" => id}) do
+    case Races.prepare_race(id, owner(conn)) do
+      {:ok, payload} -> json(conn, payload)
+      {:error, :race_not_draft} -> conn |> put_status(409) |> json(%{error: "race_not_draft"})
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> conn |> put_status(422) |> json(%{error: "unprocessable_entity"})
+    end
+  end
+
+  def unprepare(conn, %{"id" => id}) do
+    case Races.unprepare_race(id, owner(conn)) do
+      {:ok, race} -> json(conn, race)
+      {:error, :race_not_ready} -> conn |> put_status(409) |> json(%{error: "race_not_ready"})
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
+      _ -> not_found(conn)
+    end
+  end
+
   def activate(conn, %{"id" => id}) do
     case Races.activate_race(id, owner(conn)) do
       {:ok, payload} -> json(conn, payload)
+      {:error, :race_not_ready} -> conn |> put_status(409) |> json(%{error: "race_not_ready"})
+      {:error, :forbidden} -> conn |> put_status(403) |> json(%{error: "forbidden"})
       _ -> conn |> put_status(422) |> json(%{error: "unprocessable_entity"})
     end
   end

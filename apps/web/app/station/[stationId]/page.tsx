@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OfflineIndicator } from "@/components/station/offline-indicator";
+import { RaceNotStarted } from "@/components/station/race-not-started";
 import { PatrolPicker } from "@/components/station/patrol-picker";
 import { ScoreForm } from "@/components/station/score-form";
 import { useStationLogin, useStationMe, useStationEntries } from "@/lib/queries/station";
@@ -87,6 +88,7 @@ export default function StationPage() {
     error: stationMeError,
     isLoading: stationMeLoading,
     isSuccess: stationMeSuccess,
+    refetch: refetchStationMe,
   } = useStationMe(stationId, loginToken ?? undefined, hasStationToken && !loginError);
   const { data: stationEntriesData } = useStationEntries(stationId, stationMeSuccess);
 
@@ -112,6 +114,9 @@ export default function StationPage() {
     const pendingPatrols = new Set(pending.map((e) => e.patrol));
     return [...server.filter((e) => !pendingPatrols.has(e.patrol)), ...pending];
   }, [stationEntriesData, outbox.items]);
+
+  // 409 race_not_started — QR i PIN jsou v pořádku, závod jen ještě neběží.
+  const notStarted = getNotStartedInfo(loginError) ?? getNotStartedInfo(stationMeError);
 
   const booting = exchangingPin || (hasStationToken && stationMeLoading);
   const err = loginError ?? stationMeError;
@@ -158,6 +163,25 @@ export default function StationPage() {
   function onSaved() {
     setSelected(null);
     setMode("pick");
+  }
+
+  if (notStarted && !payload) {
+    return (
+      <RaceNotStarted
+        raceName={notStarted.raceName}
+        stationName={notStarted.stationName}
+        entityLabel="Stanoviště"
+        onRetry={async () => {
+          if (pinFromUrl) {
+            // Uvolnit guard a nechat login effect proběhnout znovu.
+            loginAttemptedForPin.current = null;
+            setLoginError(null);
+          } else {
+            await refetchStationMe();
+          }
+        }}
+      />
+    );
   }
 
   if (booting) {
@@ -299,6 +323,20 @@ export default function StationPage() {
       </Dialog>
     </div>
   );
+}
+
+function getNotStartedInfo(err: unknown): { raceName?: string; stationName?: string } | null {
+  if (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    typeof err.body === "object" &&
+    err.body !== null &&
+    (err.body as { error?: string }).error === "race_not_started"
+  ) {
+    const body = err.body as { race_name?: string; station_name?: string };
+    return { raceName: body.race_name, stationName: body.station_name };
+  }
+  return null;
 }
 
 function BlockedEntriesNotice({
