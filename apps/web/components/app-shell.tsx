@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AppVersion } from "@/components/app-version";
 import { ThemeToggle } from "@/components/theme-toggle";
 import * as Auth from "@/lib/api/auth";
 import type { Organizer } from "@/lib/api/types";
@@ -70,6 +71,10 @@ export function AppShell({
       </header>
 
       <main className="container py-8">{children}</main>
+
+      <footer className="container flex justify-center pb-4">
+        <AppVersion />
+      </footer>
     </div>
   );
 }

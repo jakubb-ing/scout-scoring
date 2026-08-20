@@ -4,6 +4,7 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, LogOut, Phone, QrCode, RefreshCw } from "lucide-react";
+import { AppVersion } from "@/components/app-version";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -207,6 +208,10 @@ export default function StationPage() {
             />
           </div>
         ) : null}
+
+        <div className="mt-8 text-center">
+          <AppVersion />
+        </div>
       </main>
     </div>
   );

@@ -13,6 +13,11 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 ### Added
 
+- Verzování přes release-please: Release PR drží v souladu `VERSION`,
+  `mix.exs` a `package.json`; kontrola konvenčního názvu PR v CI.
+- Verze aplikace v patičce FE (`AppVersion` — login, dashboard, stanoviště)
+  a v odpovědi `GET /api/health`.
+- `make version-show` vypíše verze ze všech tří míst.
 - Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.
 - Výsledková stránka uzavřeného závodu s tabulkami po kategoriích.
 - Detail hlídky s body po stanovištích a rozbalením podúkolů/kritérií.

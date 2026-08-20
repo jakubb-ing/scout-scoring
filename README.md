@@ -1,6 +1,6 @@
 # scout-scoring
 
-Monorepo pro aplikaci Scout Scoring (viz `docs/spec.md`).
+Monorepo pro aplikaci Scout Scoring (viz `docs/plan.md`).
 
 Aktuální projektová verze je v `VERSION`; změny mezi verzemi se zapisují do
 `CHANGELOG.md`.
@@ -53,14 +53,17 @@ Prerekvizita: Elixir 1.19+, Erlang/OTP 28+, SurrealDB 3.x CLI.
 
 ## Verzování a changelog
 
-- Root `VERSION` drží aktuální projektovou verzi.
-- `apps/api/mix.exs` a `apps/web/package.json` drží verze jednotlivých aplikací;
-  při release je drž synchronizované s root verzí, pokud není výslovný důvod je
-  vydávat samostatně.
-- `CHANGELOG.md` obsahuje sekci `Unreleased` pro průběžné změny a sekce
-  konkrétních verzí podle SemVer (`MAJOR.MINOR.PATCH`).
-- Při větší produktové, API, routovací nebo workflow změně doplň `CHANGELOG.md`
-  ve stejném kroku jako README/docs.
+Verze posouvá **release-please** (GitHub Action): čte konvenční commity na
+`main`, otevírá „Release PR" s bumpem verze a CHANGELOGem; merge PR = tag +
+GitHub Release. Přes `extra-files` drží v souladu root `VERSION`,
+`apps/api/mix.exs` i `apps/web/package.json` — tři místa, jeden vlastník.
+
+- **Konvence commitů (a názvů PR — squash-merge!):** `feat:` → MINOR,
+  `fix:` → PATCH, `feat!:` / `BREAKING CHANGE:` → MAJOR. Commity bez prefixu
+  se do CHANGELOGu nedostanou. Názvy PR hlídá workflow `pr-title.yml`.
+- Migrace schématu je vždy minimálně MINOR bump.
+- `make version-show` vypíše verze ze všech tří míst vedle sebe.
+- Verze je vidět v patičce FE (`AppVersion`) a v `GET /api/health`.
 
 ## Auth
 

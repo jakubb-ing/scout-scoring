@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogIn, QrCode } from "lucide-react";
+import { AppVersion } from "@/components/app-version";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,10 @@ export default function StationEntryPage() {
             </Button>
           </form>
         )}
+
+        <div className="mt-6 text-center">
+          <AppVersion />
+        </div>
       </div>
     </main>
   );

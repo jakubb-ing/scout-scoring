@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { AppVersion } from "@/components/app-version";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,6 +84,10 @@ export default function LoginPage() {
             Registrace je pouze na pozvánku
           </p>
         </form>
+
+        <div className="mt-6 text-center">
+          <AppVersion />
+        </div>
       </div>
     </main>
   );

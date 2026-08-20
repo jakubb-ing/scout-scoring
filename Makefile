@@ -1,4 +1,4 @@
-.PHONY: help db-local api-setup api-migrate api-seed api-server api-test
+.PHONY: help db-local api-setup api-migrate api-seed api-server api-test version-show
 
 help:
 	@echo "Scout Scoring — monorepo"
@@ -31,3 +31,8 @@ api-server:
 
 api-test:
 	cd apps/api && mix test
+
+version-show:
+	@printf "VERSION       %s\n" "$$(cut -d' ' -f1 VERSION)"
+	@printf "mix.exs       %s\n" "$$(grep -o 'version: \"[^\"]*\"' apps/api/mix.exs | head -1 | cut -d'"' -f2)"
+	@printf "package.json  %s\n" "$$(grep -o '\"version\": \"[^\"]*\"' apps/web/package.json | cut -d'"' -f4)"

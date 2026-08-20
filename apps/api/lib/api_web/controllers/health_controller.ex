@@ -8,6 +8,10 @@ defmodule ApiWeb.HealthController do
         _ -> "down"
       end
 
-    json(conn, %{status: "ok", db: db})
+    json(conn, %{
+      status: "ok",
+      db: db,
+      version: Application.spec(:api, :vsn) |> to_string()
+    })
   end
 end
