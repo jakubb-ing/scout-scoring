@@ -1,4 +1,4 @@
-.PHONY: help db-local api-setup api-migrate api-seed api-server api-test version-show
+.PHONY: help db-local api-setup api-migrate api-seed api-server api-test test test-api test-db test-web version-show
 
 help:
 	@echo "Scout Scoring — monorepo"
@@ -9,6 +9,8 @@ help:
 	@echo "  make api-seed       Create first organizer (SEED_EMAIL, SEED_PASS env)"
 	@echo "  make api-server     Run Phoenix on :4000"
 	@echo "  make api-test       Run API tests"
+	@echo "  make test           All tests that do not need a database (api + web)"
+	@echo "  make test-db        API tests against a running SurrealDB (make db-local)"
 	@echo ""
 	@echo "Prod: DB runs as a separate surrealdb instance (fly.io), configured via"
 	@echo "SURREAL_URL / SURREAL_NS / SURREAL_DB / SURREAL_USER / SURREAL_PASS env vars."
@@ -29,8 +31,19 @@ api-seed:
 api-server:
 	cd apps/api && mix phx.server
 
-api-test:
+api-test: test-api
+
+test-api:
 	cd apps/api && mix test
+
+# Potřebuje běžící SurrealDB — `make db-local` v druhém terminálu.
+test-db:
+	cd apps/api && mix test --include db
+
+test-web:
+	cd apps/web && npm test
+
+test: test-api test-web
 
 version-show:
 	@printf "VERSION       %s\n" "$$(cut -d' ' -f1 VERSION)"

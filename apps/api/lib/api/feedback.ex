@@ -158,7 +158,7 @@ defmodule Api.Feedback do
             )
 
           with {:ok, created} when is_map(created) <- result do
-            AuditLog.log("feedback.started", "patrol:#{patrol_id}", race_id, created["id"], %{
+            AuditLog.log("feedback.started", patrol_id, race_id, created["id"], %{
               patrol: patrol_id,
               device_id: device_id
             })
@@ -166,7 +166,8 @@ defmodule Api.Feedback do
             {:ok, created}
           end
 
-        %{"id" => id, "lock_device" => lock_device} ->
+        %{"id" => id} ->
+          lock_device = Map.get(record, "lock_device")
           claim = if lock_device in [nil, ""], do: ", lock_at = time::now()", else: ""
 
           SurrealDB.one(
@@ -191,11 +192,13 @@ defmodule Api.Feedback do
 
   defp ensure_lock(nil, _device_id), do: :ok
 
-  defp ensure_lock(%{"lock_device" => lock_device} = record, device_id) do
-    cond do
-      lock_device in [nil, ""] -> :ok
-      lock_device == device_id -> :ok
-      true -> {:error, {:locked_by_other_device, record["lock_at"]}}
+  defp ensure_lock(record, device_id) when is_map(record) do
+    # Po `lock_device = NONE` (submit, reopen, takeover) SurrealDB pole
+    # ze záznamu odstraní úplně — proto Map.get, ne pattern match na klíč.
+    case Map.get(record, "lock_device") do
+      empty when empty in [nil, ""] -> :ok
+      ^device_id -> :ok
+      _ -> {:error, {:locked_by_other_device, Map.get(record, "lock_at")}}
     end
   end
 
@@ -210,7 +213,9 @@ defmodule Api.Feedback do
           # Není co přebírat — první autosave lock založí sám.
           {:error, :not_found}
 
-        %{"id" => id, "lock_device" => from_device} ->
+        %{"id" => id} ->
+          from_device = Map.get(record, "lock_device")
+
           result =
             SurrealDB.one(
               "UPDATE $id SET lock_device = type::string($device), lock_at = time::now();",
@@ -218,7 +223,7 @@ defmodule Api.Feedback do
             )
 
           with {:ok, updated} when is_map(updated) <- result do
-            AuditLog.log("feedback.taken_over", "patrol:#{patrol_id}", patrol["race"], id, %{
+            AuditLog.log("feedback.taken_over", patrol_id, patrol["race"], id, %{
               patrol: patrol_id,
               from_device: from_device,
               to_device: device_id
@@ -257,7 +262,7 @@ defmodule Api.Feedback do
         action =
           if (record["reopen_count"] || 0) > 0, do: "feedback.resubmitted", else: "feedback.submitted"
 
-        AuditLog.log(action, "patrol:#{patrol_id}", patrol["race"], record["id"], %{
+        AuditLog.log(action, patrol_id, patrol["race"], record["id"], %{
           patrol: patrol_id,
           positives: submitted["positives"],
           negatives: submitted["negatives"],
@@ -301,7 +306,7 @@ defmodule Api.Feedback do
           )
 
         with {:ok, reopened} when is_map(reopened) <- result do
-          AuditLog.log("feedback.reopened", "organizer:#{organizer_id}", record["race"], feedback_id, %{
+          AuditLog.log("feedback.reopened", organizer_id, record["race"], feedback_id, %{
             patrol: record["patrol"],
             reason: reason,
             positives: record["positives"],

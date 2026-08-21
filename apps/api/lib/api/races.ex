@@ -315,9 +315,12 @@ defmodule Api.Races do
     member_organizer = attrs["organizer_id"] || attrs["organizer"]
     role = attrs["role"]
 
-    with true <- role in ["read", "edit"],
+    # Pořadí a značky chyb: neplatná role je :invalid_role, přidání
+    # vlastníka jako člena :invalid_member. Dřív byly obě větve svedené
+    # do jednoho `false` a chyby se hlásily prohozeně.
+    with :ok <- ensure_member_role(role),
          {:ok, race} <- ensure_race_edit(race_id, organizer_id),
-         false <- race["owner"] == member_organizer do
+         :ok <- ensure_not_owner(race, member_organizer) do
       case SurrealDB.one(
              "SELECT id FROM race_member WHERE race = $race AND organizer = $organizer LIMIT 1;",
              %{race: race_id, organizer: member_organizer}
@@ -340,10 +343,16 @@ defmodule Api.Races do
           err
       end
     else
-      false -> {:error, :invalid_member}
+      {:error, _} = err -> err
       _ -> {:error, :not_found}
     end
   end
+
+  defp ensure_member_role(role) when role in ["read", "edit"], do: :ok
+  defp ensure_member_role(_role), do: {:error, :invalid_role}
+
+  defp ensure_not_owner(%{"owner" => owner}, owner), do: {:error, :invalid_member}
+  defp ensure_not_owner(_race, _member), do: :ok
 
   def update_race_member(membership_id, organizer_id, %{"role" => role})
       when role in ["read", "edit"] do
@@ -579,13 +588,17 @@ defmodule Api.Races do
     end
   end
 
-  # V `ready` smí projít jen name + members — start_number a kategorie mění
-  # zařazení ve výsledcích a startovní číslo je vytištěné na kartách.
-  # Pokus o změnu zamčeného pole je chyba, ne tiché ignorování. Filtr žije
-  # v kontextu, ať ho nejde obejít jiným endpointem.
-  defp restrict_patrol_attrs(%{"state" => "draft"}, _patrol, attrs), do: {:ok, attrs}
+  @doc """
+  V `ready` smí projít jen name + members — start_number a kategorie mění
+  zařazení ve výsledcích a startovní číslo je vytištěné na kartách.
+  Pokus o změnu zamčeného pole je chyba, ne tiché ignorování. Filtr žije
+  v kontextu, ať ho nejde obejít jiným endpointem.
+  """
+  def restrict_patrol_attrs(race, patrol, attrs)
 
-  defp restrict_patrol_attrs(%{"state" => "ready"}, patrol, attrs) do
+  def restrict_patrol_attrs(%{"state" => "draft"}, _patrol, attrs), do: {:ok, attrs}
+
+  def restrict_patrol_attrs(%{"state" => "ready"}, patrol, attrs) do
     start_number_changed? =
       Map.has_key?(attrs, "start_number") and attrs["start_number"] != patrol["start_number"]
 
@@ -630,10 +643,7 @@ defmodule Api.Races do
          {:ok, race} <- ensure_race_edit(patrol["race"], organizer_id),
          :ok <- ensure_state_in(race, ["ready", "active"], :race_not_running),
          {:ok, updated} when is_map(updated) <-
-           SurrealDB.one(
-             "UPDATE $id SET withdrawn = true, withdrawn_at = time::now(), withdrawn_reason = $reason;",
-             %{id: id, reason: reason}
-           ) do
+           withdraw_patrol_record(id, reason) do
       AuditLog.log("patrol.withdraw", organizer_id, patrol["race"], id, %{
         name: patrol["name"],
         reason: reason
@@ -645,6 +655,33 @@ defmodule Api.Races do
       {:error, _} = err -> err
       _ -> {:error, :not_found}
     end
+  end
+
+  # Důvod je volitelný. `nil` nelze poslat jako parametr — SurrealDB ho
+  # předá jako NULL a `option<string>` ho odmítne; musí se vynechat celé
+  # přiřazení, aby zůstalo NONE.
+  defp withdraw_patrol_record(id, reason) when is_binary(reason) and reason != "" do
+    SurrealDB.one(
+      """
+      UPDATE $id SET
+        withdrawn = true,
+        withdrawn_at = time::now(),
+        withdrawn_reason = $reason;
+      """,
+      %{id: id, reason: reason}
+    )
+  end
+
+  defp withdraw_patrol_record(id, _reason) do
+    SurrealDB.one(
+      """
+      UPDATE $id SET
+        withdrawn = true,
+        withdrawn_at = time::now(),
+        withdrawn_reason = NONE;
+      """,
+      %{id: id}
+    )
   end
 
   def restore_patrol(id, organizer_id) do
@@ -960,20 +997,21 @@ defmodule Api.Races do
   @doc "Lookup a station by id, only if active and race running. Used by station-auth plug."
   def get_active_station(id) do
     case get_station_for_login(id) do
-      {:ok, %{"race_state" => "active"} = station} -> {:ok, station}
+      {:ok, %{"race_state" => "active", "is_active" => true} = station} -> {:ok, station}
       _ -> {:error, :not_found}
     end
   end
 
   @doc """
-  Lookup bez filtru na stav závodu — vrací i `race_state` a `race_name`,
-  aby login/plug uměly odlišit „závod neběží" od „špatný PIN".
+  Lookup bez filtru na stav — vrací i `race_state` a `race_name`, aby
+  login/plug uměly odlišit „závod neběží" od „špatný PIN". Filtrovat tady
+  na `is_active` nejde: v `draft` a po uzavření je false, takže by obojí
+  skončilo hláškou o špatném PINu.
   """
   def get_station_for_login(id) do
     sql = """
     SELECT *, race.state AS race_state, race.name AS race_name
     FROM $id
-    WHERE is_active = true
     LIMIT 1;
     """
 
@@ -995,6 +1033,11 @@ defmodule Api.Races do
 
           station["race_state"] == "closed" ->
             {:error, :race_closed}
+
+          # Jednotlivě deaktivované stanoviště v běžícím závodě je záměrné
+          # zamčení — tam se stav neprozrazuje.
+          station["is_active"] != true ->
+            {:error, :invalid_pin}
 
           station["pin"] == pin ->
             {:ok, station}

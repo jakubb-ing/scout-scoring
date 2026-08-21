@@ -19,7 +19,7 @@ defmodule ApiWeb.ScoreCorrectionController do
              station_id,
              patrol_id,
              params,
-             "organizer:#{organizer_id}",
+             organizer_id,
              params["reason"]
            ) do
       json(conn, entry)
@@ -39,7 +39,7 @@ defmodule ApiWeb.ScoreCorrectionController do
 
     with {:ok, _race} <- Races.ensure_race_edit(race_id, organizer_id),
          :ok <-
-           Scoring.correct_delete(race_id, entry_id, "organizer:#{organizer_id}", params["reason"]) do
+           Scoring.correct_delete(race_id, entry_id, organizer_id, params["reason"]) do
       send_resp(conn, 204, "")
     else
       {:error, :race_not_closed} -> conn |> put_status(409) |> json(%{error: "race_not_closed"})

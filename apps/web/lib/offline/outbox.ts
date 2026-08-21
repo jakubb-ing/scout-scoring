@@ -61,11 +61,18 @@ export function onFlushResult(listener: FlushListener) {
 
 let queryClient: QueryClient | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+let autoFlush = true;
 
-/** Zavolat jednou z Providers — připojí queryClient a spustí flusher. */
-export function initOutbox(qc: QueryClient) {
+/**
+ * Zavolat jednou z Providers — připojí queryClient a spustí flusher.
+ * `autoFlush: false` vypne samovolné flushe (interval, `online` event,
+ * flush po zařazení do fronty); hodí se testům, které chtějí každý
+ * průchod řídit samy.
+ */
+export function initOutbox(qc: QueryClient, options: { autoFlush?: boolean } = {}) {
   queryClient = qc;
-  if (typeof window === "undefined") return;
+  autoFlush = options.autoFlush !== false;
+  if (typeof window === "undefined" || !autoFlush) return;
   if (!flushTimer) {
     flushTimer = setInterval(() => void flushOutbox(), 30_000);
     window.addEventListener("online", () => void flushOutbox());
@@ -107,7 +114,7 @@ export async function enqueue(kind: string, payload: unknown): Promise<void> {
   });
 
   reg.onApplied(queryClient, payload);
-  void flushOutbox();
+  if (autoFlush) void flushOutbox();
 }
 
 function defaultClassify(error: unknown): ErrorDisposition {
@@ -169,19 +176,34 @@ async function runFlush(): Promise<void> {
   for (const listener of flushListeners) listener(result);
 }
 
+let inFlight: Promise<void> | null = null;
+
 /**
  * Flush běží pod Web Lockem — dva otevřené taby jinak posílají frontu
  * souběžně. Když lock drží jiný tab, tenhle průchod se přeskočí.
+ *
+ * V rámci jednoho tabu se souběžná volání slučují do jednoho průchodu
+ * a **všechna počkají na jeho dokončení**. Kdyby se místo toho přeskočila,
+ * volající (typicky UI po zařazení do fronty) by dostal řízení zpět dřív,
+ * než se cokoli odeslalo, a hlásil by nesmysl.
  */
 export async function flushOutbox(): Promise<void> {
   if (typeof window === "undefined") return;
-  if (navigator.locks?.request) {
-    await navigator.locks.request("ss.outbox-flush", { ifAvailable: true }, async (lock) => {
-      if (lock) await runFlush();
-    });
-  } else {
-    await runFlush();
-  }
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    if (navigator.locks?.request) {
+      await navigator.locks.request("ss.outbox-flush", { ifAvailable: true }, async (lock) => {
+        if (lock) await runFlush();
+      });
+    } else {
+      await runFlush();
+    }
+  })().finally(() => {
+    inFlight = null;
+  });
+
+  return inFlight;
 }
 
 /** Po úspěšném re-loginu vrátí položky zablokované na 401 do fronty. */

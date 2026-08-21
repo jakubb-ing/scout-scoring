@@ -25,6 +25,7 @@ import { qk } from "@/lib/queries/keys";
 import { ApiError, tokens } from "@/lib/api/client";
 import type { FeedbackMePayload } from "@/lib/api/feedback";
 import { useIsOffline } from "@/lib/offline/online";
+import { formatWindowRemaining } from "@/lib/feedback/window";
 import { useOfflineMutation, useOutboxStatus } from "@/lib/offline/hooks";
 import { resumeBlocked } from "@/lib/offline/outbox";
 import {
@@ -37,7 +38,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 type PinExchangeState = "idle" | "pending" | "success" | "error";
 
 const DEVICE_ID_KEY = "ss.feedback_device_id";
-const WINDOW_HOURS = 12;
 
 function getDeviceId(): string {
   if (typeof window === "undefined") return "";
@@ -298,7 +298,7 @@ function FeedbackForm({
     }
   }
 
-  const windowInfo = windowRemaining(race.state, race.closed_at, feedback?.reopened_at ?? null);
+  const windowInfo = formatWindowRemaining(race.state, race.closed_at, feedback?.reopened_at ?? null);
 
   const saveStatus = saving
     ? "Ukládám…"
@@ -479,20 +479,6 @@ function FieldGroup({
 
 function seedFields(saved: string[] | undefined, count: number): string[] {
   return Array.from({ length: count }, (_, i) => saved?.[i] ?? "");
-}
-
-function windowRemaining(state: string, closedAt?: string | null, reopenedAt?: string | null) {
-  if (state !== "closed") return null;
-  const base = [closedAt, reopenedAt]
-    .map((v) => (v ? new Date(v).getTime() : NaN))
-    .filter((t) => Number.isFinite(t));
-  if (base.length === 0) return null;
-  const deadline = Math.max(...base) + WINDOW_HOURS * 60 * 60 * 1000;
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) return null;
-  const hours = Math.floor(remaining / 3_600_000);
-  const minutes = Math.floor((remaining % 3_600_000) / 60_000);
-  return `Formulář jde uzavřít ještě ${hours} h ${minutes} min`;
 }
 
 function getNotStartedInfo(err: unknown): { raceName?: string; patrolName?: string } | null {

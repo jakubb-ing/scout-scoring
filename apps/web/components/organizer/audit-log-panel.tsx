@@ -6,27 +6,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getAuditLog } from "@/lib/api/dashboard";
 import { useAuditLog } from "@/lib/queries/dashboard";
+import {
+  CSV_BOM,
+  actionLabel,
+  auditCsvFilename,
+  buildAuditCsv,
+  formatActor,
+  formatTime,
+  reasonOf,
+} from "@/lib/audit/csv";
 import type { AuditLogEntry, Patrol, Station } from "@/lib/api/types";
 
 const PAGE_SIZE = 50;
 const EXPORT_PAGE_SIZE = 500;
-
-const ACTION_LABELS: Record<string, string> = {
-  "score.create": "zápis bodů",
-  "score.update": "změna bodů",
-  "score.delete": "smazání zápisu",
-  "score.correct": "oprava bodů",
-  "score.correct_delete": "smazání při opravě",
-  "race.prepare": "příprava závodu",
-  "race.unprepare": "návrat do přípravy",
-  "race.activate": "spuštění závodu",
-  "race.close": "uzavření závodu",
-  "race.reissue_tokens": "nové QR kódy",
-  "patrol.withdraw": "stažení hlídky",
-  "patrol.restore": "vrácení hlídky",
-  "feedback.submitted": "odevzdání zpětné vazby",
-  "feedback.reopened": "odemčení zpětné vazby",
-};
 
 export function AuditLogPanel({
   raceId,
@@ -126,9 +118,7 @@ export function AuditLogPanel({
                     {formatTime(row.at)}
                   </td>
                   <td className="px-3 py-2 text-12 text-scout-text-muted">{formatActor(row.actor)}</td>
-                  <td className="px-3 py-2 text-12 text-scout-text">
-                    {ACTION_LABELS[row.action] ?? row.action}
-                  </td>
+                  <td className="px-3 py-2 text-12 text-scout-text">{actionLabel(row.action)}</td>
                   <td className="px-3 py-2 text-12 text-scout-text">{formatTarget(row, names)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right text-12 font-semibold tabular-nums text-scout-text">
                     {formatChange(row)}
@@ -158,20 +148,6 @@ export function AuditLogPanel({
   );
 }
 
-function formatTime(value?: string) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("cs-CZ");
-}
-
-function formatActor(actor: string) {
-  if (actor?.startsWith("station:")) return "stanoviště";
-  if (actor?.startsWith("patrol:")) return "doprovod";
-  if (actor?.startsWith("organizer:")) return "organizátor";
-  return actor ?? "—";
-}
-
 function formatTarget(row: AuditLogEntry, names: Map<string, string>) {
   const payload = row.payload ?? {};
   const patrol = typeof payload.patrol === "string" ? names.get(payload.patrol) ?? payload.patrol : null;
@@ -190,45 +166,14 @@ function formatChange(row: AuditLogEntry) {
   return "";
 }
 
-function reasonOf(row: AuditLogEntry) {
-  const reason = row.payload?.reason;
-  return typeof reason === "string" ? reason : "";
-}
-
 function downloadCsv(rows: AuditLogEntry[], names: Map<string, string>, raceId: string) {
-  const header = ["cas", "kdo", "akce", "hlidka", "stanoviste", "puvodne", "nove", "duvod"];
-  const lines = rows.map((row) => {
-    const payload = row.payload ?? {};
-    const patrol = typeof payload.patrol === "string" ? names.get(payload.patrol) ?? payload.patrol : "";
-    const station = typeof payload.station === "string" ? names.get(payload.station) ?? payload.station : "";
-    return [
-      formatTime(row.at),
-      formatActor(row.actor),
-      ACTION_LABELS[row.action] ?? row.action,
-      patrol,
-      station,
-      typeof payload.before_total === "number" ? String(payload.before_total) : "",
-      typeof payload.after_total === "number" ? String(payload.after_total) : "",
-      reasonOf(row),
-    ];
+  const blob = new Blob([CSV_BOM + buildAuditCsv(rows, names)], {
+    type: "text/csv;charset=utf-8",
   });
-
-  const csv = [header, ...lines]
-    .map((cols) => cols.map(escapeCsv).join(","))
-    .join("\r\n");
-
-  // BOM kvůli Excelu a české diakritice.
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `historie-zmen-${raceId.replace(/[^A-Za-z0-9]/g, "-")}.csv`;
+  link.download = auditCsvFilename(raceId);
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function escapeCsv(value: string) {
-  const needsQuotes = /[",\r\n]/.test(value);
-  const escaped = value.replace(/"/g, '""');
-  return needsQuotes ? `"${escaped}"` : escaped;
 }

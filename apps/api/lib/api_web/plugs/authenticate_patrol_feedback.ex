@@ -47,7 +47,7 @@ defmodule ApiWeb.Plugs.AuthenticatePatrolFeedback do
           conn
           |> assign(:patrol, patrol)
           |> assign(:race_id, rid)
-          |> assign(:actor, "patrol:#{pid}")
+          |> assign(:actor, pid)
       end
     else
       _ ->

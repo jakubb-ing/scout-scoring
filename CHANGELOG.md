@@ -43,6 +43,9 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
   ve výsledcích — default vypnuto), QR karty pro doprovod v záložce
   Hlídky, stav odevzdání a „Vrátit k editaci" (obsah admin editovat
   nemůže, verze textu jsou v audit logu), sekce v detailu hlídky.
+- Testy: 217 testů API (čisté unit + integrační proti SurrealDB přes
+  `Api.DBCase`, request testy přes `Api.APICase`) a 19 testů offline
+  outboxu na webu; `make test`, `make test-db`, CI workflow `test.yml`.
 - Dodatečné opravy bodů po uzavření závodu: záložka „Opravy" s maticí
   hlídka × stanoviště, dialog s povinným důvodem a přehledem
   „původně X → nově Y", panel „Historie změn" s filtrem, stránkováním
@@ -54,6 +57,19 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 - Výsledková stránka uzavřeného závodu s tabulkami po kategoriích.
 - Detail hlídky s body po stanovištích a rozbalením podúkolů/kritérií.
 - A4 export výsledků s QR kódem na online výsledkovou stránku.
+
+### Fixed
+
+- Stažení hlídky bez uvedeného důvodu selhávalo (`NULL` do `option<string>`).
+- Po odemčení zpětné vazby adminem dostal doprovod chybu serveru — pole
+  `lock_device` po `NONE` ze záznamu mizí a pattern match na něj nesedl.
+- Přihlášení stanoviště hlásilo v přípravě i po uzavření závodu „špatný
+  PIN" místo skutečného stavu; plug po uzavření vracel 401 místo 423,
+  takže offline fronta radila zbytečné přihlášení.
+- Actor se v nových cestách zapisoval do audit logu dvakrát prefixovaný.
+- `Scoring.delete_entry/3` padalo na kódování audit payloadu.
+- Prohozené chybové kódy při sdílení závodu (`invalid_role` vs.
+  `invalid_member`).
 
 ### Changed
 

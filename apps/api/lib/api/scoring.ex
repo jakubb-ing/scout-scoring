@@ -190,19 +190,29 @@ defmodule Api.Scoring do
     end
   end
 
-  defp total_points(nil), do: nil
+  @doc """
+  Součet bodů zápisu; `nil` pro chybějící záznam, aby šlo v audit logu
+  odlišit opravu z nuly od doplnění chybějícího hodnocení.
+  """
+  def total_points(nil), do: nil
 
-  defp total_points(entry) do
+  def total_points(entry) do
     (entry["scores"] || [])
     |> Enum.map(&(Map.get(&1, "points") || 0))
     |> Enum.sum()
   end
 
-  defp ensure_reason(reason) when is_binary(reason) do
+  @doc """
+  Důvod opravy je povinný — oprava bez odůvodnění je v audit logu
+  k ničemu. Minimum jsou 3 znaky, aby neprošla tečka nebo mezera.
+  """
+  def validate_reason(reason) when is_binary(reason) do
     if String.length(String.trim(reason)) >= 3, do: :ok, else: {:error, :reason_required}
   end
 
-  defp ensure_reason(_), do: {:error, :reason_required}
+  def validate_reason(_), do: {:error, :reason_required}
+
+  defp ensure_reason(reason), do: validate_reason(reason)
 
   defp ensure_race_closed(race_id) do
     case SurrealDB.one("SELECT state FROM $id;", %{id: race_id}) do
@@ -214,11 +224,21 @@ defmodule Api.Scoring do
 
   def delete_entry(race_id, entry_id, actor) do
     with :ok <- ensure_race_open(race_id) do
-      before = SurrealDB.one("SELECT * FROM $id;", %{id: entry_id})
+      # Payload musí být JSON-encodovatelný — `SurrealDB.one/2` vrací
+      # {:ok, map}, který by Jason neuměl a zápis do logu by spadl.
+      before =
+        case SurrealDB.one("SELECT * FROM $id;", %{id: entry_id}) do
+          {:ok, entry} when is_map(entry) -> entry
+          _ -> nil
+        end
 
       case SurrealDB.query("DELETE $id;", %{id: entry_id}) do
         {:ok, _} ->
-          AuditLog.log("score.delete", actor, race_id, entry_id, %{before: before})
+          AuditLog.log("score.delete", actor, race_id, entry_id, %{
+            before: before && before["scores"],
+            before_total: total_points(before)
+          })
+
           :ok
 
         err ->

@@ -17,6 +17,7 @@ defmodule ApiWeb.RaceMemberController do
     case Races.upsert_race_member(race_id, owner(conn), params) do
       {:ok, member} -> conn |> put_status(201) |> json(member)
       {:error, :invalid_member} -> conn |> put_status(422) |> json(%{error: "invalid_member"})
+      {:error, :invalid_role} -> conn |> put_status(422) |> json(%{error: "invalid_role"})
       {:error, :forbidden} -> forbidden(conn)
       _ -> conn |> put_status(422) |> json(%{error: "unprocessable_entity"})
     end

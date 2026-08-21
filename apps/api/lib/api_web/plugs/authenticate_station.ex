@@ -27,11 +27,14 @@ defmodule ApiWeb.Plugs.AuthenticateStation do
            StationToken.verify(token, @max_age_seconds),
          {:ok, station} <- Races.get_station_for_login(sid),
          true <- station["race"] == rid,
-         true <- station["access_token_hash"] == nonce do
+         true <- station["access_token_hash"] == nonce,
+         station_active = station["is_active"] do
       # Platný token, ale závod neběží (např. návrat active → ready):
       # stejný kód jako login, ať FE ukáže „závod nebyl spuštěn", ne re-scan.
       case station["race_state"] do
-        "active" ->
+        # Deaktivace stanoviště musí token zneplatnit okamžitě — proto se
+        # `is_active` kontroluje tady, ne až v lookupu.
+        "active" when station_active == true ->
           conn
           |> assign(:station, station)
           |> assign(:race_id, rid)
@@ -47,6 +50,22 @@ defmodule ApiWeb.Plugs.AuthenticateStation do
               race_name: station["race_name"],
               station_name: station["name"],
               state: state
+            })
+          )
+          |> halt()
+
+        # Uzavřený závod musí dát 423, ne 401. Offline fronta podle toho
+        # rozliší „závod byl mezitím uzavřen" (položka zůstane a jde
+        # zachránit přes Opravy) od „vypršel přístup, přihlas se znovu".
+        "closed" ->
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(
+            423,
+            Jason.encode!(%{
+              error: "race_closed",
+              race_name: station["race_name"],
+              station_name: station["name"]
             })
           )
           |> halt()

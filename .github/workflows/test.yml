@@ -1,0 +1,91 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    name: API (ExUnit + SurrealDB)
+    runs-on: ubuntu-latest
+
+    services:
+      surrealdb:
+        image: surrealdb/surrealdb:v3.0.0
+        ports:
+          - 8000:8000
+        options: >-
+          --health-cmd "/surreal is-ready"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+        env:
+          SURREAL_USER: root
+          SURREAL_PASS: root
+          SURREAL_PATH: memory
+
+    env:
+      MIX_ENV: test
+      SURREAL_URL: http://127.0.0.1:8000
+      SURREAL_USER: root
+      SURREAL_PASS: root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/api/deps
+            apps/api/_build
+          key: ${{ runner.os }}-mix-${{ hashFiles('apps/api/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install deps
+        working-directory: apps/api
+        run: mix deps.get
+
+      - name: Compile (warnings are errors)
+        working-directory: apps/api
+        run: mix compile --warnings-as-errors
+
+      # Včetně DB testů — služba SurrealDB běží výš.
+      - name: Test
+        working-directory: apps/api
+        run: mix test --include db
+
+  web:
+    name: Web (typecheck, vitest, build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install deps
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: apps/web
+        run: npm test
+
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
