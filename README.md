@@ -271,13 +271,15 @@ GitHub Release. Přes `extra-files` drží v souladu root `VERSION`,
 
 Organizátorský dashboard používá `GET /api/races/:race_id/dashboard`.
 Payload obsahuje agregace po hlídkách a stanovištích plus `activity` — jeden
-řádek za každý záznam skóre (`score_entry`). Live aktivita proto ukazuje
-konkrétní průchod hlídky stanovištěm: stanoviště, hlídku, body a čas poslední
-aktualizace. Frontend polluje dashboard přibližně každých 10 s.
+řádek za každý záznam skóre (`score_entry`). Hlavní Přehled zobrazuje celkový
+postup hodnocení a vedle sebe tabulky dokončení hlídek a průběhu stanovišť.
+Samostatná záložka Live aktivita ukazuje poslední zápisy bodů. Frontend polluje
+dashboard přibližně každých 10 s.
 
-Dashboard má čtyři hlavní taby: Přehled, Hlídky, Stanoviště a Nastavení. Na
-mobilu a tabletu se výběr závodu, nastavení, uživatelé a odhlášení přesouvají
-do hamburger menu. Tab navigace se na mobilu přepne na ikonové záložky bez
+Dashboard má pět hlavních tabů: Přehled, Live aktivita, Hlídky, Stanoviště a
+Nastavení; po uzavření přibývají Opravy. Na
+mobilu a tabletu se výběr závodu, uživatelé a odhlášení přesouvají do
+hamburger menu. Tab navigace se na mobilu přepne na ikonové záložky bez
 horizontálního nebo vertikálního scrollu; aktivní záložka je zvýrazněná spodním
 žlutým borderem.
 

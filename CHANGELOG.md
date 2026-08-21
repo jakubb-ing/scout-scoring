@@ -53,7 +53,8 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
   „upraveno" s časem (bez důvodu a jména — ty zůstávají v audit logu).
 - Prompt „Je k dispozici nová verze" — service worker se vyměňuje až po
   potvrzení, ne uprostřed práce.
-- Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.
+- Samostatná záložka Live aktivita s desetisekundovým obnovováním posledních
+  zápisů bodů ze stanovišť.
 - Výsledková stránka uzavřeného závodu s tabulkami po kategoriích.
 - Detail hlídky s body po stanovištích a rozbalením podúkolů/kritérií.
 - A4 export výsledků s QR kódem na online výsledkovou stránku.
@@ -73,6 +74,9 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 ### Changed
 
+- Organizátorský Přehled zobrazuje celkový postup a pod ním vedle sebe postup
+  hlídek a průběh stanovišť; stavové akce jsou v headeru závodu a Live
+  aktivita má vlastní záložku.
 - Mobilní rozestupy na dashboardu, výsledcích a detailu hlídky jsou kompaktnější.
 - Mobilní a tabletová dashboard hlavička přesouvá výběr závodu, nastavení, uživatele a logout do hamburger menu.
 - Root README popisuje aktuální frontend trasy, dashboard activity payload a výsledkové workflow.

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users, Wrench } from "lucide-react";
+import { Activity, ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users, Wrench } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,9 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { RaceState } from "@/lib/api/types";
 import { RaceSelector } from "@/components/organizer/race-selector";
 import { OverviewTab } from "@/components/organizer/overview-tab";
+import { ActivityTab } from "@/components/organizer/activity-tab";
 import { PatrolsTab } from "@/components/organizer/patrols-tab";
 import { StationsTab } from "@/components/organizer/stations-tab";
 import { CorrectionsTab } from "@/components/organizer/corrections-tab";
@@ -26,7 +26,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import * as Auth from "@/lib/api/auth";
 import { ApiError, tokens } from "@/lib/api/client";
 import { useMe } from "@/lib/queries/auth";
-import { useRaces } from "@/lib/queries/races";
+import {
+  useActivateRace,
+  useCloseRace,
+  usePrepareRace,
+  useRaces,
+  useUnprepareRace,
+} from "@/lib/queries/races";
 import { useEffect, useState } from "react";
 
 const CURRENT_RACE_KEY = "ss.current_race";
@@ -53,6 +59,11 @@ export default function DashboardPage() {
     error: racesError,
     isLoading: racesLoading,
   } = useRaces();
+  const actionRaceId = currentId ?? "__nil__";
+  const prepare = usePrepareRace(actionRaceId);
+  const unprepare = useUnprepareRace(actionRaceId);
+  const activate = useActivateRace(actionRaceId);
+  const close = useCloseRace(actionRaceId);
 
   useEffect(() => {
     const err = meError ?? racesError;
@@ -89,6 +100,53 @@ export default function DashboardPage() {
   useEffect(() => {
     if (tab === "corrections" && !canCorrect) setTab("overview");
   }, [tab, canCorrect]);
+
+  async function onPrepare() {
+    if (!confirm("Připravit závod ke spuštění? Vydají se PINy a QR kódy pro stanoviště — v tabu Stanoviště je pak můžeš vytisknout.")) return;
+    try {
+      await prepare.mutateAsync();
+      toast.success("Závod připraven. QR kódy najdeš v tabu Stanoviště.");
+    } catch {
+      toast.error("Příprava selhala.");
+    }
+  }
+
+  async function onUnprepare() {
+    if (!confirm("Vrátit závod do přípravy? Vytištěné QR kódy zůstávají v platnosti — PINy se nemění.")) return;
+    try {
+      await unprepare.mutateAsync();
+      toast.success("Závod vrácen do přípravy.");
+    } catch {
+      toast.error("Návrat do přípravy selhal.");
+    }
+  }
+
+  async function onActivate() {
+    try {
+      await activate.mutateAsync();
+      toast.success("Závod spuštěn.");
+    } catch {
+      toast.error("Aktivace selhala.");
+    }
+  }
+
+  async function onClose() {
+    if (
+      !confirm(
+        "Opravdu uzavřít závod? Uzavření je nevratné:\n\n" +
+          "• rozhodčí už nebudou moci zapisovat body,\n" +
+          "• neodeslané offline zápisy zůstanou zablokované,\n" +
+          "• body půjde upravit už jen přes opravy s uvedením důvodu."
+      )
+    ) return;
+
+    try {
+      await close.mutateAsync();
+      toast.success("Závod uzavřen.");
+    } catch {
+      toast.error("Uzavření selhalo.");
+    }
+  }
 
   if (booting) {
     return (
@@ -142,7 +200,6 @@ export default function DashboardPage() {
             onCreated={(r) => setCurrentId(r.id)}
             isAdmin={!!meData?.is_admin}
             onUsers={() => router.push("/users")}
-            onSettings={() => setTab("settings")}
             onLogout={() => {
               Auth.logout();
               router.replace("/login");
@@ -153,25 +210,55 @@ export default function DashboardPage() {
         {current ? (
           <>
             <section className="flex shrink-0 flex-col gap-3 bg-dashboard-hero px-3 py-3 text-white sm:px-7 sm:py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
-              <div className="min-w-0">
-                <div className="mb-1.25 flex flex-wrap items-center gap-2.5">
-                  <RaceStatePill state={current.state} />
-                  <span className="text-12 text-white/55">
-                    {[current.location, formatRaceDate(current.date)].filter(Boolean).join(" · ") || "Bez místa a data"}
-                  </span>
-                </div>
+              <div className="min-w-0 shrink-0">
                 <h1 className="truncate text-22 font-bold leading-none">{current.name}</h1>
+                <p className="mt-1.25 text-12 text-white/55">
+                  {[formatRaceDate(current.date), current.location].filter(Boolean).join(" · ") || "Bez data a místa"}
+                </p>
               </div>
 
-              {/* Stavová osa dává akcím v Přehledu kontext — je vidět,
-                  kde závod je a co bude následovat. */}
-              <RaceStateFlow state={current.state} className="hidden lg:flex" />
+              <div className="flex min-w-0 flex-col items-start gap-2 lg:items-end">
+                <div className="max-w-full overflow-x-auto pb-0.5">
+                  <RaceStateFlow state={current.state} className="min-w-max" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {current.state === "draft" ? (
+                    <Button className="bg-white text-scout-blue hover:bg-white/90" onClick={onPrepare} disabled={prepare.isPending}>
+                      Připravit ke spuštění
+                    </Button>
+                  ) : null}
+                  {current.state === "ready" ? (
+                    <>
+                      <Button className="border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white" variant="outline" onClick={onUnprepare} disabled={unprepare.isPending}>
+                        Zpět do přípravy
+                      </Button>
+                      <Button className="bg-white text-scout-blue hover:bg-white/90" onClick={onActivate} disabled={activate.isPending}>
+                        Spustit závod
+                      </Button>
+                    </>
+                  ) : null}
+                  {current.state === "active" ? (
+                    <Button className="border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white" variant="outline" onClick={onClose} disabled={close.isPending}>
+                      Uzavřít závod
+                    </Button>
+                  ) : null}
+                  {current.state === "closed" ? (
+                    <Button className="bg-white text-scout-blue hover:bg-white/90" onClick={() => router.push(`/dashboard/results?raceId=${encodeURIComponent(current.id)}`)}>
+                      Zobrazit výsledky
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </section>
 
             <TabsList className="justify-between overflow-hidden px-3 sm:justify-start sm:px-7">
               <TabsTrigger value="overview" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
                 <LayoutDashboard className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
                 <span className="sr-only sm:not-sr-only">Přehled</span>
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
+                <Activity className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Live aktivita</span>
               </TabsTrigger>
               <TabsTrigger value="patrols" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
                 <ClipboardList className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
@@ -187,7 +274,7 @@ export default function DashboardPage() {
                   <span className="sr-only sm:not-sr-only">Opravy</span>
                 </TabsTrigger>
               ) : null}
-              <TabsTrigger value="settings" className="mb-0 hidden min-w-0 flex-1 gap-2 border-b-2.5 px-2 lg:inline-flex lg:flex-none lg:px-4.5">
+              <TabsTrigger value="settings" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
                 <Settings className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
                 <span className="sr-only sm:not-sr-only">Nastavení</span>
               </TabsTrigger>
@@ -196,6 +283,9 @@ export default function DashboardPage() {
             <main className="min-h-0 flex-1 overflow-hidden px-3 py-3 sm:p-4.5 sm:px-7">
               <TabsContent value="overview" className="h-full">
                 <OverviewTab raceId={current.id} />
+              </TabsContent>
+              <TabsContent value="activity" className="h-full">
+                <ActivityTab raceId={current.id} />
               </TabsContent>
               <TabsContent value="patrols" className="h-full">
                 <PatrolsTab raceId={current.id} />
@@ -233,7 +323,6 @@ function DashboardMobileMenu({
   onCreated,
   isAdmin,
   onUsers,
-  onSettings,
   onLogout,
 }: {
   races: Parameters<typeof RaceSelector>[0]["races"];
@@ -242,7 +331,6 @@ function DashboardMobileMenu({
   onCreated: Parameters<typeof RaceSelector>[0]["onCreated"];
   isAdmin: boolean;
   onUsers: () => void;
-  onSettings: () => void;
   onLogout: () => void;
 }) {
   return (
@@ -256,10 +344,6 @@ function DashboardMobileMenu({
         <DropdownMenuLabel className="px-0 pb-2 pt-0 text-2xs uppercase tracking-0.6 text-scout-text-muted">Závod</DropdownMenuLabel>
         <RaceSelector races={races} current={current} onPick={onPick} onCreated={onCreated} variant="menu" />
         <DropdownMenuSeparator className="my-3" />
-        <DropdownMenuItem onSelect={onSettings}>
-          <Settings className="mr-2 h-4 w-4" />
-          Nastavení
-        </DropdownMenuItem>
         {isAdmin ? (
           <DropdownMenuItem onSelect={onUsers}>
             <Users className="mr-2 h-4 w-4" />
@@ -273,30 +357,6 @@ function DashboardMobileMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function RaceStatePill({ state }: { state: RaceState }) {
-  const label =
-    state === "active"
-      ? "BĚŽÍ"
-      : state === "closed"
-        ? "UZAVŘENO"
-        : state === "ready"
-          ? "PŘIPRAVEN"
-          : "PŘÍPRAVA";
-  const tone =
-    state === "active"
-      ? "bg-scout-green text-white"
-      : state === "ready"
-        ? "bg-scout-yellow text-scout-text"
-        : state === "closed"
-          ? "bg-scout-text-muted text-white"
-          : "bg-scout-bg-subtle text-scout-text";
-  return (
-    <span className={`rounded-full px-2.25 py-0.75 text-2xs font-bold uppercase tracking-0.5 ${tone}`}>
-      ● {label}
-    </span>
   );
 }
 

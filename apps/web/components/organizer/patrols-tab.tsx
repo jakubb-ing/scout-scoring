@@ -311,7 +311,11 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
 }
 
 function getPatrolCategoryLabel(patrol: Patrol, categories: { id: string; name: string }[]) {
-  return categories.find((c) => c.id === patrol.category)?.name ?? patrol.category ?? "—";
+  return (
+    patrol.category_name ??
+    categories.find((category) => category.id === patrol.category)?.name ??
+    "—"
+  );
 }
 
 function FeedbackStatusCell({

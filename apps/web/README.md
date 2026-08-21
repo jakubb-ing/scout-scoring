@@ -7,7 +7,7 @@ Dvě hlavní obrazovky:
 
 | Trasa | Pro koho | Co dělá |
 |---|---|---|
-| `/dashboard` | organizátor | správa + live přehled (taby: Přehled, Hlídky, Stanoviště, Nastavení) |
+| `/dashboard` | organizátor | správa + průběžný přehled dokončení (taby: Přehled, Live aktivita, Hlídky, Stanoviště, Nastavení) |
 | `/station/[stationId]?pin=…` | rozhodčí na stanovišti | výběr hlídky → dynamický formulář kritérií → submit |
 
 Plus `/` (landing) a `/login` (organizátor; JWT, invite-only).
@@ -33,7 +33,7 @@ app/
   layout.tsx                 # theme provider + Toaster + fonts
   page.tsx                   # landing
   login/page.tsx
-  dashboard/page.tsx         # organizer — 4 taby
+  dashboard/page.tsx         # organizer — hlavní tabová navigace
   station/[stationId]/page.tsx
 
 components/
