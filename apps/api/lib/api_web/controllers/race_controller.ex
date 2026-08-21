@@ -1,6 +1,8 @@
 defmodule ApiWeb.RaceController do
   use ApiWeb, :controller
 
+  require Logger
+
   alias Api.Races
 
   defp owner(conn), do: conn.assigns.organizer["id"]
@@ -26,8 +28,20 @@ defmodule ApiWeb.RaceController do
 
   def update(conn, %{"id" => id} = params) do
     case Races.update_race(id, owner(conn), params) do
-      {:ok, race} -> json(conn, race)
-      _ -> not_found(conn)
+      {:ok, race} ->
+        json(conn, race)
+
+      {:error, :forbidden} ->
+        conn |> put_status(403) |> json(%{error: "forbidden"})
+
+      {:error, :not_found} ->
+        not_found(conn)
+
+      # Chyby z databáze se dřív schovávaly za 404 a vypadaly jako
+      # „závod neexistuje" — což poslalo hledání úplně jiným směrem.
+      {:error, reason} ->
+        Logger.error("Race update failed for #{id}: #{inspect(reason)}")
+        conn |> put_status(422) |> json(%{error: "unprocessable_entity"})
     end
   end
 

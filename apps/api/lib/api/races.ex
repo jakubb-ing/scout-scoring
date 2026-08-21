@@ -109,8 +109,13 @@ defmodule Api.Races do
         AuditLog.log("race.update", organizer_id, id, id, attrs)
         get_race(race["id"], organizer_id)
 
-      _ ->
+      {:ok, nil} ->
         {:error, :not_found}
+
+      # Chybu z databáze propustit dál — spolknutá se tvářila jako
+      # neexistující závod.
+      {:error, _} = err ->
+        err
     end
   end
 
