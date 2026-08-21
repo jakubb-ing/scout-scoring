@@ -45,7 +45,10 @@ web-setup:
 	cd apps/web && npm install
 	@test -f apps/web/.env || cp apps/web/.env.example apps/web/.env
 
+# Produkční build zapíše service worker do public/, který Next servíruje
+# i v dev režimu — zaregistruje se a pak drží starý bundle z cache.
 web-dev:
+	@rm -f apps/web/public/sw.js apps/web/public/sw.js.map
 	cd apps/web && npm run dev
 
 web-build:
