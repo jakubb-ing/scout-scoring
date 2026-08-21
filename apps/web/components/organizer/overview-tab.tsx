@@ -8,6 +8,8 @@ import { useRace, useActivateRace, useCloseRace, usePrepareRace, useUnprepareRac
 import { useDashboard, useLeaderboardGroups } from "@/lib/queries/dashboard";
 import type { DashboardActivityRow, DashboardPatrolRow, DashboardStationRow } from "@/lib/api/types";
 import { fromNowFormat } from "@/lib/utils";
+import { raceStateHint } from "@/components/organizer/race-state-flow";
+import type { RaceState } from "@/lib/api/types";
 import { toast } from "sonner";
 
 export function OverviewTab({ raceId }: { raceId: string }) {
@@ -87,27 +89,43 @@ export function OverviewTab({ raceId }: { raceId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2.5 sm:gap-3.5">
-      <div className="flex shrink-0 justify-end gap-2">
-        {race.state === "draft" ? (
-          <Button onClick={onPrepare} disabled={prepare.isPending}>Připravit ke spuštění</Button>
-        ) : null}
-        {race.state === "ready" ? (
-          <>
-            <Button variant="outline" onClick={onUnprepare} disabled={unprepare.isPending}>Zpět do přípravy</Button>
-            <Button onClick={onActivate} disabled={activate.isPending}>Spustit závod</Button>
-          </>
-        ) : null}
-        {race.state === "active" ? (
-          <Button variant="outline" onClick={onClose} disabled={close.isPending}>Uzavřít závod</Button>
-        ) : null}
-        {race.state === "closed" ? (
-          <Button variant="outline" onClick={() => router.push(`/dashboard/results?raceId=${encodeURIComponent(raceId)}`)}>Zobrazit výsledky</Button>
-        ) : null}
-      </div>
+      {/* Stavový blok: co teď platí, co z toho plyne a jaká je další akce.
+          Tlačítko tak není osamocené — je vidět, proč je zrovna dostupné. */}
+      <section className="flex shrink-0 flex-col gap-3 rounded-12 border border-scout-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-13 font-semibold text-scout-text">{raceStateHeadline(race.state)}</div>
+          <p className="mt-0.5 text-12 text-scout-text-muted">{raceStateHint(race.state)}</p>
+        </div>
+
+        <div className="flex shrink-0 gap-2">
+          {race.state === "draft" ? (
+            <Button onClick={onPrepare} disabled={prepare.isPending}>Připravit ke spuštění</Button>
+          ) : null}
+          {race.state === "ready" ? (
+            <>
+              <Button variant="outline" onClick={onUnprepare} disabled={unprepare.isPending}>Zpět do přípravy</Button>
+              <Button onClick={onActivate} disabled={activate.isPending}>Spustit závod</Button>
+            </>
+          ) : null}
+          {race.state === "active" ? (
+            <Button variant="outline" onClick={onClose} disabled={close.isPending}>Uzavřít závod</Button>
+          ) : null}
+          {race.state === "closed" ? (
+            <Button variant="outline" onClick={() => router.push(`/dashboard/results?raceId=${encodeURIComponent(raceId)}`)}>Zobrazit výsledky</Button>
+          ) : null}
+        </div>
+      </section>
+
+      <ScoringProgressCard
+        done={allEntries}
+        total={maxEntries}
+        progress={progress}
+        patrols={totalPatrols}
+        stations={totalStations}
+      />
 
       <div className="grid min-h-0 flex-1 gap-3 sm:gap-4.5 xl:grid-cols-[360px,minmax(0,1fr)]">
         <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden sm:gap-3.5">
-          <ProgressRingCard progress={progress} done={allEntries} total={maxEntries} patrols={totalPatrols} stations={totalStations} />
           <ActivityFeedCard activity={activity} loading={loading} />
         </div>
 
@@ -120,60 +138,50 @@ export function OverviewTab({ raceId }: { raceId: string }) {
   );
 }
 
-function ProgressRingCard({
-  progress,
+/**
+ * Postup hodnocení. Nejdůležitější číslo na dashboardu — organizátor
+ * podle něj pozná, jestli závod běží tak, jak má.
+ */
+function ScoringProgressCard({
   done,
   total,
+  progress,
   patrols,
   stations,
 }: {
-  progress: number;
   done: number;
   total: number;
+  progress: number;
   patrols: number;
   stations: number;
 }) {
-  const size = 164;
-  const radius = 64;
-  const circumference = 2 * Math.PI * radius;
-  const dash = (progress / 100) * circumference;
-
   return (
-    <section className="flex max-h-[320px] shrink-0 items-center gap-3 rounded-12 border border-scout-border bg-white p-3 sm:gap-5 sm:p-5">
-      <div className="relative h-41 w-41 shrink-0">
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#E4E1D8" strokeWidth={14} />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="#294885"
-            strokeDasharray={`${dash} ${circumference - dash}`}
-            strokeLinecap="round"
-            strokeWidth={14}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-32 font-bold leading-none text-scout-blue">{progress}%</div>
-          <div className="mt-0.5 text-11 text-scout-text-muted">průběh</div>
+    <section className="shrink-0 rounded-12 border border-scout-border bg-white px-4 py-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <div className="text-2xs font-semibold uppercase tracking-0.6 text-scout-text-muted">
+            Hodnocení
+          </div>
+          <div className="mt-0.5 text-22 font-bold leading-none tabular-nums text-scout-text">
+            {done} / {total}{" "}
+            <span className="text-14 font-normal text-scout-text-muted">dokončeno</span>
+          </div>
         </div>
+        <div className="text-26 font-bold leading-none tabular-nums text-scout-blue">{progress} %</div>
       </div>
-      <div className="flex flex-col gap-2.5 sm:gap-3.5">
-        <Stat label="Zápisů" value={`${done} / ${total}`} />
-        <Stat label="Hlídky" value={String(patrols)} />
-        <Stat label="Stanoviště" value={String(stations)} />
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-scout-bg-track">
+        <div
+          className={`h-full transition-all ${progress >= 100 ? "bg-scout-green" : "bg-scout-blue"}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="mt-2 flex gap-4 text-12 text-scout-text-muted">
+        <span><span className="font-semibold text-scout-text">{patrols}</span> hlídek</span>
+        <span><span className="font-semibold text-scout-text">{stations}</span> stanovišť</span>
       </div>
     </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="mb-0.25 text-2xs font-medium uppercase tracking-0.6 text-scout-text-muted">{label}</div>
-      <div className="text-20 font-bold text-scout-text">{value}</div>
-    </div>
   );
 }
 
@@ -313,4 +321,19 @@ function StationsOverviewCard({ stations, totalPatrols }: { stations: DashboardS
       )}
     </section>
   );
+}
+
+function raceStateHeadline(state: RaceState): string {
+  switch (state) {
+    case "draft":
+      return "Závod je v přípravě";
+    case "ready":
+      return "Závod je připraven ke spuštění";
+    case "active":
+      return "Závod běží";
+    case "closed":
+      return "Závod je uzavřený";
+    default:
+      return "";
+  }
 }

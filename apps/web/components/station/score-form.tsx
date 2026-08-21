@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, /* Clock, */ Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, /* Clock, */ Loader2 } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
+import { CategoryBadge } from "@/components/category-badge";
+import { cn } from "@/lib/utils";
+import { useIsOffline } from "@/lib/offline/online";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +19,7 @@ import type { Patrol, ScoreEntry, StationCriterion } from "@/lib/api/types";
 
 interface Props {
   stationId: string;
+  stationName?: string;
   patrol: Patrol;
   criteria: StationCriterion[];
   allowHalfPoints?: boolean;
@@ -82,7 +86,16 @@ function createScoreFormSchema(criteria: StationCriterion[], allowHalfPoints: bo
     });
 }
 
-export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false, existing, onSaved, onCancel }: Props) {
+export function ScoreForm({
+  stationId,
+  stationName,
+  patrol,
+  criteria,
+  allowHalfPoints = false,
+  existing,
+  onSaved,
+  onCancel,
+}: Props) {
   const upsert = useUpsertScoreEntry();
   const schema = useMemo(() => createScoreFormSchema(criteria, allowHalfPoints), [allowHalfPoints, criteria]);
   const {
@@ -106,6 +119,25 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
   // const withTime = watch("withTime");
   const watchedPoints = useWatch({ control, name: "points" });
   const [submitting, setSubmitting] = useState(false);
+  const isOffline = useIsOffline();
+
+  // Konec seznamu kritérií — dokud není v dohledu, obsah pokračuje pod
+  // spodní lištou a rozhodčí o něm nemusí vědět.
+  const endSentinelRef = useRef<HTMLDivElement>(null);
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
+
+  useEffect(() => {
+    const sentinel = endSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setHasMoreBelow(!entry.isIntersecting),
+      // Lišta zabírá spodek obrazovky, takže konec musí být nad ní.
+      { rootMargin: "0px 0px -96px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [criteria]);
 
   const total = useMemo(
     () => criteria.reduce((sum, c, index) => sum + (Number(watchedPoints?.[criterionFieldKey(c, index)]) || 0), 0),
@@ -134,7 +166,15 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
         arrived_at: values.withTime && values.arrivedAt ? `${today}T${values.arrivedAt}:00` : null,
         departed_at: values.withTime && values.departedAt ? `${today}T${values.departedAt}:00` : null,
       });
-      toast.success(`Uloženo - ${patrol.name} (${total} b.)`);
+      // Zápis jde do fronty; že je v databázi, hlásí až flush
+      // (OfflineIndicator). Tvrdit tu víc, než víme, by rozhodčího ukolébalo.
+      if (isOffline) {
+        toast.success(`Uloženo offline — ${patrol.name}, ${total} b.`, {
+          description: "Odešle se automaticky, jakmile bude signál.",
+        });
+      } else {
+        toast.success(`Uloženo — ${patrol.name}, ${total} b.`);
+      }
       onSaved();
     } catch {
       toast.error("Uložení selhalo. Zkus to znovu.");
@@ -145,19 +185,24 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="-mx-3.5 sm:mx-0">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-3.5 sm:px-0">
-        <div>
-          <div className="text-12 text-scout-text-muted">
-            <span className="font-mono">#{patrol.start_number}</span> · {patrol.category_name ?? formatCategory(patrol.category)}
-          </div>
-          <div className="text-21 font-bold text-scout-text">{patrol.name}</div>
-        </div>
-        {existing ? (
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-scout-yellow-border bg-scout-yellow-soft px-3 py-1 text-11 text-scout-text">
-            <CheckCircle2 className="h-3.5 w-3.5 text-accent-foreground" />
-            <span>Přepisuješ existující zápis</span>
-          </div>
+      <div className="mb-4 px-3.5 sm:px-0">
+        {stationName ? (
+          <div className="text-11 uppercase tracking-0.6 text-scout-text-muted">{stationName}</div>
         ) : null}
+        <div className="mt-0.5 flex items-baseline gap-2">
+          <span className="text-21 font-bold tabular-nums text-scout-blue">#{patrol.start_number}</span>
+          <span className="truncate text-21 font-bold text-scout-text">{patrol.name}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <CategoryBadge label={patrol.category_name ?? formatCategory(patrol.category)} />
+          {existing ? (
+            // Méně výrazné než body — nemá odvádět pozornost od hodnocení.
+            <span className="inline-flex items-center gap-1 text-11 text-scout-text-muted">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Upravuješ již uložený zápis
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="px-3.5 sm:px-0">
@@ -178,6 +223,7 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
             })
           }
         />
+        <div ref={endSentinelRef} className="h-px" />
       </div>
 
       {/* Dočasně skryto — zaznamenávání času příchodu/odchodu.
@@ -205,20 +251,39 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
       </div>
       */}
 
-      <div className="mx-3.5 mt-4 flex items-center gap-3 border-t-1.5 border-scout-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0">
-        <div className="min-w-0 flex-1">
-          <div className="text-11 text-scout-text-muted">Celkem bodů</div>
-          <div className="text-26 font-bold leading-none tabular-nums text-scout-text">
-            {total}<span className="text-14 font-normal text-scout-text-muted"> / {maxTotal}</span>
+      {/* Místo pod poslední kritérium, aby ho fixní lišta nepřekrývala. */}
+      <div aria-hidden className="h-[calc(5.5rem+env(safe-area-inset-bottom))]" />
+
+      <div className="fixed inset-x-0 bottom-0 z-20">
+        {/* Náznak, že obsah pokračuje pod okrajem. Zmizí, jakmile je konec
+            kritérií v dohledu — trvalý signál by při hodnocení rušil. */}
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none h-10 bg-gradient-to-t from-scout-bg-app to-transparent transition-opacity duration-300",
+            hasMoreBelow ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <div className="flex h-full items-end justify-center pb-1">
+            <ChevronDown className="h-4 w-4 animate-bounce text-scout-text-muted" />
           </div>
         </div>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Zrušit
-        </Button>
-        <Button type="submit" variant="accent" size="lg" disabled={submitting} className="shrink-0">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Uložit ({total} b.)
-        </Button>
+
+        <div className="flex items-center gap-3 border-t-1.5 border-scout-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+          <div className="min-w-0 flex-1">
+            <div className="text-11 text-scout-text-muted">Celkem bodů</div>
+            <div className="text-26 font-bold leading-none tabular-nums text-scout-text">
+              {total}<span className="text-14 font-normal text-scout-text-muted"> / {maxTotal}</span>
+            </div>
+          </div>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Zrušit
+          </Button>
+          <Button type="submit" variant="accent" size="lg" disabled={submitting} className="shrink-0">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Uložit ({total} b.)
+          </Button>
+        </div>
       </div>
     </form>
   );

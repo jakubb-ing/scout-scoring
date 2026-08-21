@@ -103,6 +103,11 @@ export default function StationPage() {
   const [selected, setSelected] = useState<Patrol | null>(null);
   const [mode, setMode] = useState<Mode>("pick");
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  // Hlídka, u které se právě uložil zápis — v seznamu se krátce zvýrazní.
+  const [justSavedId, setJustSavedId] = useState<string | null>(null);
+  // Pozice scrollu v seznamu, aby se rozhodčí po uložení vrátil tam, kde byl.
+  const listScrollRef = React.useRef(0);
+  const mainRef = React.useRef<HTMLElement>(null);
 
   const payload = stationMeData;
 
@@ -162,14 +167,31 @@ export default function StationPage() {
 
   function onSelect(id: string) {
     const p = payload?.patrols.find((x) => x.id === id) ?? null;
+    // Zapamatovat, kde v seznamu rozhodčí byl — po uložení se tam vrátí.
+    listScrollRef.current = mainRef.current?.scrollTop ?? 0;
     setSelected(p);
     if (p) setMode("score");
   }
 
-  function onSaved() {
+  function backToList() {
     setSelected(null);
     setMode("pick");
+    // Obnovit pozici až po vykreslení seznamu.
+    requestAnimationFrame(() => {
+      if (mainRef.current) mainRef.current.scrollTop = listScrollRef.current;
+    });
   }
+
+  function onSaved(patrolId: string) {
+    setJustSavedId(patrolId);
+    backToList();
+  }
+
+  useEffect(() => {
+    if (!justSavedId) return;
+    const timer = setTimeout(() => setJustSavedId(null), 2_500);
+    return () => clearTimeout(timer);
+  }, [justSavedId]);
 
   if (notStarted && !payload) {
     return (
@@ -224,7 +246,7 @@ export default function StationPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setSelected(null); setMode("pick"); }}
+                onClick={backToList}
                 className="text-white/80 hover:bg-white/10 hover:text-white"
                 aria-label="Zpět"
               >
@@ -261,7 +283,7 @@ export default function StationPage() {
         </div>
       </header>
 
-      <main className="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6">
+      <main ref={mainRef} className="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6">
         {outbox.blockedCount > 0 ? (
           <BlockedEntriesNotice
             items={outbox.items.filter((i) => i.status === "blocked" && i.kind === "station.score")}
@@ -276,6 +298,7 @@ export default function StationPage() {
               patrols={payload.patrols}
               entries={entries}
               selectedId={selected?.id ?? null}
+              highlightId={justSavedId}
               onSelect={onSelect}
             />
           </div>
@@ -283,19 +306,23 @@ export default function StationPage() {
           <div className="min-h-0 w-full">
             <ScoreForm
               stationId={stationId}
+              stationName={station.name}
               patrol={selected}
               criteria={station.criteria.map((c, index) => ({ ...c, id: index }))}
               allowHalfPoints={station.allow_half_points === true}
               existing={existingForSelected}
-              onSaved={onSaved}
-              onCancel={() => { setSelected(null); setMode("pick"); }}
+              onSaved={() => onSaved(selected.id)}
+              onCancel={backToList}
             />
           </div>
         ) : null}
 
-        <div className="mt-8 text-center">
-          <AppVersion />
-        </div>
+        {/* Ve formuláři je patička schovaná pod fixní lištou. */}
+        {mode === "pick" ? (
+          <div className="mt-8 text-center">
+            <AppVersion />
+          </div>
+        ) : null}
       </main>
 
       <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>

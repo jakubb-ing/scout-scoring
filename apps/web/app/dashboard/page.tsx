@@ -20,6 +20,7 @@ import { OverviewTab } from "@/components/organizer/overview-tab";
 import { PatrolsTab } from "@/components/organizer/patrols-tab";
 import { StationsTab } from "@/components/organizer/stations-tab";
 import { CorrectionsTab } from "@/components/organizer/corrections-tab";
+import { RaceStateFlow } from "@/components/organizer/race-state-flow";
 import { SettingsTab } from "@/components/organizer/settings-tab";
 import { EmptyState } from "@/components/ui/empty-state";
 import * as Auth from "@/lib/api/auth";
@@ -151,8 +152,8 @@ export default function DashboardPage() {
 
         {current ? (
           <>
-            <section className="flex shrink-0 items-center gap-3 bg-dashboard-hero px-3 py-3 text-white sm:gap-4 sm:px-7 sm:py-4">
-              <div className="min-w-0 flex-1">
+            <section className="flex shrink-0 flex-col gap-3 bg-dashboard-hero px-3 py-3 text-white sm:px-7 sm:py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+              <div className="min-w-0">
                 <div className="mb-1.25 flex flex-wrap items-center gap-2.5">
                   <RaceStatePill state={current.state} />
                   <span className="text-12 text-white/55">
@@ -161,6 +162,10 @@ export default function DashboardPage() {
                 </div>
                 <h1 className="truncate text-22 font-bold leading-none">{current.name}</h1>
               </div>
+
+              {/* Stavová osa dává akcím v Přehledu kontext — je vidět,
+                  kde závod je a co bude následovat. */}
+              <RaceStateFlow state={current.state} className="hidden lg:flex" />
             </section>
 
             <TabsList className="justify-between overflow-hidden px-3 sm:justify-start sm:px-7">
