@@ -1,5 +1,12 @@
 import { apiFetch } from "./client";
-import type { DashboardPayload, LeaderboardGroup, LeaderboardRow, ResultsPayload } from "./types";
+import type {
+  AuditLogEntry,
+  DashboardPayload,
+  LeaderboardGroup,
+  LeaderboardRow,
+  ResultsPayload,
+  ScoreEntry,
+} from "./types";
 
 interface ListResponse<T> { data: T[] }
 
@@ -32,5 +39,55 @@ export async function getLeaderboardGroups(raceId: string): Promise<LeaderboardG
 export async function getResults(raceId: string): Promise<ResultsPayload> {
   return apiFetch<ResultsPayload>(`/api/races/${raceId}/results`, {
     scope: "organizer",
+  });
+}
+
+export interface AuditQuery {
+  action?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getAuditLog(raceId: string, query: AuditQuery = {}): Promise<AuditLogEntry[]> {
+  const params = new URLSearchParams();
+  if (query.action) params.set("action", query.action);
+  if (query.limit != null) params.set("limit", String(query.limit));
+  if (query.offset != null) params.set("offset", String(query.offset));
+  const qs = params.toString();
+
+  const res = await apiFetch<ListResponse<AuditLogEntry>>(
+    `/api/races/${raceId}/audit${qs ? `?${qs}` : ""}`,
+    { scope: "organizer" }
+  );
+  return res.data ?? [];
+}
+
+export interface CorrectScorePayload {
+  station_id: string;
+  patrol_id: string;
+  scores: { criterion: string; points: number }[];
+  reason: string;
+}
+
+export async function correctScoreEntry(
+  raceId: string,
+  payload: CorrectScorePayload
+): Promise<ScoreEntry> {
+  return apiFetch<ScoreEntry>(`/api/races/${raceId}/scores/correct`, {
+    method: "POST",
+    scope: "organizer",
+    body: payload,
+  });
+}
+
+export async function deleteScoreEntry(
+  raceId: string,
+  entryId: string,
+  reason: string
+): Promise<void> {
+  await apiFetch<void>(`/api/races/${raceId}/scores/${encodeURIComponent(entryId)}`, {
+    method: "DELETE",
+    scope: "organizer",
+    body: { reason },
   });
 }

@@ -111,7 +111,25 @@ function PatrolResultsContent() {
                               </span>
                             </td>
                             <td className="px-2 py-2 text-right text-13 font-bold tabular-nums text-scout-blue sm:px-3 sm:py-2.5">{row.points}</td>
-                            <td className="px-2 py-2 text-right text-12 text-scout-text-muted sm:px-3 sm:py-2.5">{row.entry ? "Zapsáno" : "Bez záznamu"}</td>
+                            <td className="px-2 py-2 text-right text-12 text-scout-text-muted sm:px-3 sm:py-2.5">
+                              {row.entry ? (
+                                row.entry.corrected_at ? (
+                                  // Zveřejněné výsledky, které se tiše změní, podrývají
+                                  // důvěru — oprava se přiznává. Kdo a proč zůstává
+                                  // jen v audit logu pro organizátory.
+                                  <span
+                                    className="text-scout-amber"
+                                    title={`Upraveno ${new Date(row.entry.corrected_at).toLocaleString("cs-CZ")}`}
+                                  >
+                                    Upraveno
+                                  </span>
+                                ) : (
+                                  "Zapsáno"
+                                )
+                              ) : (
+                                "Bez záznamu"
+                              )}
+                            </td>
                           </tr>
                           {expanded ? (
                             <tr className="border-b border-scout-border bg-white">

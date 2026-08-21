@@ -18,7 +18,7 @@ defmodule ApiWeb.PublicController do
     with {:ok, race} <- Races.verify_public_results_code(race_id, code),
          {:ok, stations} <- Races.list_stations_public_full(race_id),
          {:ok, patrols} <- Races.list_patrols_public(race_id),
-         {:ok, scores} <- Scoring.list_for_race(race_id),
+         {:ok, scores} <- Scoring.list_for_race_public(race_id),
          {:ok, leaderboard} <- Scoring.leaderboard(race_id) do
       # Slovní hodnocení dětí jde do veřejné odpovědi jen s výslovným
       # souhlasem organizátora (race.feedback_public, default vypnuto).

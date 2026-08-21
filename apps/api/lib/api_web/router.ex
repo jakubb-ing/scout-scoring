@@ -87,6 +87,9 @@ defmodule ApiWeb.Router do
     get "/races/:race_id/leaderboard", DashboardController, :leaderboard
     get "/races/:race_id/results", DashboardController, :results
     get "/races/:race_id/audit", DashboardController, :audit
+
+    post "/races/:race_id/scores/correct", ScoreCorrectionController, :upsert
+    delete "/races/:race_id/scores/:entry_id", ScoreCorrectionController, :delete
   end
 
   scope "/api/station", ApiWeb do

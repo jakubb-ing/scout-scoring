@@ -105,14 +105,34 @@ defmodule ApiWeb.DashboardController do
     end
   end
 
-  def audit(conn, %{"race_id" => rid}) do
+  def audit(conn, %{"race_id" => rid} = params) do
+    opts =
+      [
+        action: params["action"],
+        limit: parse_int(params["limit"]),
+        offset: parse_int(params["offset"])
+      ]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
     with {:ok, _} <- Races.get_race(rid, owner(conn)),
-         {:ok, logs} <- AuditLog.list_for_race(rid) do
+         {:ok, logs} <- AuditLog.list_for_race(rid, opts) do
       json(conn, %{data: logs})
     else
       _ -> conn |> put_status(404) |> json(%{error: "not_found"})
     end
   end
+
+  defp parse_int(nil), do: nil
+
+  defp parse_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_int(value) when is_integer(value), do: value
+  defp parse_int(_), do: nil
 
   defp sum_points(entries) do
     entries

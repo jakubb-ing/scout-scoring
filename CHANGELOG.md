@@ -43,6 +43,11 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
   ve výsledcích — default vypnuto), QR karty pro doprovod v záložce
   Hlídky, stav odevzdání a „Vrátit k editaci" (obsah admin editovat
   nemůže, verze textu jsou v audit logu), sekce v detailu hlídky.
+- Dodatečné opravy bodů po uzavření závodu: záložka „Opravy" s maticí
+  hlídka × stanoviště, dialog s povinným důvodem a přehledem
+  „původně X → nově Y", panel „Historie změn" s filtrem, stránkováním
+  a exportem do CSV. Ve výsledcích se opravený záznam přiznává odznakem
+  „upraveno" s časem (bez důvodu a jména — ty zůstávají v audit logu).
 - Prompt „Je k dispozici nová verze" — service worker se vyměňuje až po
   potvrzení, ne uprostřed práce.
 - Live aktivita v dashboardu ukazuje jednotlivé průchody hlídek stanovišti.

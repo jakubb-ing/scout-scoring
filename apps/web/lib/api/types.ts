@@ -128,8 +128,21 @@ export interface ScoreEntry {
   created_at?: string;
   updated_at?: string;
   submitted_by?: string;
+  corrected_at?: string | null;
+  corrected_by?: string | null;
+  correction_reason?: string | null;
   /** Jen lokální (neodeslaný) zápis z outboxu — viz PendingScoreEntry. */
   _pending?: true;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  actor: string;
+  race?: string;
+  entity?: string;
+  at?: string;
+  payload?: Record<string, unknown> | null;
 }
 
 /**

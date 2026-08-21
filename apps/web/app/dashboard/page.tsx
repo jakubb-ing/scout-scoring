@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users } from "lucide-react";
+import { ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users, Wrench } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import { RaceSelector } from "@/components/organizer/race-selector";
 import { OverviewTab } from "@/components/organizer/overview-tab";
 import { PatrolsTab } from "@/components/organizer/patrols-tab";
 import { StationsTab } from "@/components/organizer/stations-tab";
+import { CorrectionsTab } from "@/components/organizer/corrections-tab";
 import { SettingsTab } from "@/components/organizer/settings-tab";
 import { EmptyState } from "@/components/ui/empty-state";
 import * as Auth from "@/lib/api/auth";
@@ -80,6 +81,13 @@ export default function DashboardPage() {
   const races = racesData ?? [];
   const current = races.find((r) => r.id === currentId) ?? null;
   const booting = hasToken === null || (hasToken && (meLoading || racesLoading));
+  // Opravy bodů jsou výhradně poopravný nástroj — tab dává smysl jen
+  // u uzavřeného závodu a jen s právem editace.
+  const canCorrect = current?.state === "closed" && current.access_role !== "read";
+
+  useEffect(() => {
+    if (tab === "corrections" && !canCorrect) setTab("overview");
+  }, [tab, canCorrect]);
 
   if (booting) {
     return (
@@ -168,6 +176,12 @@ export default function DashboardPage() {
                 <MapPinned className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
                 <span className="sr-only sm:not-sr-only">Stanoviště</span>
               </TabsTrigger>
+              {canCorrect ? (
+                <TabsTrigger value="corrections" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
+                  <Wrench className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Opravy</span>
+                </TabsTrigger>
+              ) : null}
               <TabsTrigger value="settings" className="mb-0 hidden min-w-0 flex-1 gap-2 border-b-2.5 px-2 lg:inline-flex lg:flex-none lg:px-4.5">
                 <Settings className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
                 <span className="sr-only sm:not-sr-only">Nastavení</span>
@@ -184,6 +198,11 @@ export default function DashboardPage() {
               <TabsContent value="stations" className="h-full">
                 <StationsTab raceId={current.id} />
               </TabsContent>
+              {canCorrect ? (
+                <TabsContent value="corrections" className="h-full">
+                  <CorrectionsTab raceId={current.id} />
+                </TabsContent>
+              ) : null}
               <TabsContent value="settings" className="h-full overflow-y-auto">
                 <SettingsTab raceId={current.id} />
               </TabsContent>

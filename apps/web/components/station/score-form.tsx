@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NumberStepperInput } from "@/components/ui/number-stepper-input";
+import { CriteriaInputs, clamp, criterionFieldKey } from "@/components/station/criteria-inputs";
 import { Switch } from "@/components/ui/switch";
 import { useUpsertScoreEntry } from "@/lib/queries/station";
 import type { Patrol, ScoreEntry, StationCriterion } from "@/lib/api/types";
@@ -161,27 +161,23 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
       </div>
 
       <div className="px-3.5 sm:px-0">
-        <div className="space-y-3">
-          {criteria.map((criterion, index) => {
-            const fieldKey = criterionFieldKey(criterion, index);
-            return (
-              <CriterionRow
-                key={fieldKey}
-                inputId={`crit-${fieldKey}`}
-                criterion={criterion}
-                allowHalfPoints={allowHalfPoints}
-                value={watchedPoints?.[fieldKey] ?? "0"}
-                onChange={(value) =>
-                  setValue(`points.${fieldKey}`, String(value), {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                error={formState.errors.points?.[fieldKey]?.message}
-              />
-            );
-          })}
-        </div>
+        <CriteriaInputs
+          criteria={criteria}
+          values={watchedPoints ?? {}}
+          allowHalfPoints={allowHalfPoints}
+          errors={Object.fromEntries(
+            criteria.map((c, index) => {
+              const key = criterionFieldKey(c, index);
+              return [key, formState.errors.points?.[key]?.message];
+            })
+          )}
+          onChange={(fieldKey, value) =>
+            setValue(`points.${fieldKey}`, String(value), {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
+        />
       </div>
 
       {/* Dočasně skryto — zaznamenávání času příchodu/odchodu.
@@ -228,55 +224,6 @@ export function ScoreForm({ stationId, patrol, criteria, allowHalfPoints = false
   );
 }
 
-function CriterionRow({
-  inputId,
-  criterion,
-  allowHalfPoints,
-  value,
-  onChange,
-  error,
-}: {
-  inputId: string;
-  criterion: StationCriterion;
-  allowHalfPoints: boolean;
-  value: string;
-  onChange: (value: number) => void;
-  error?: string;
-}) {
-  const max = Math.max(0, Number(criterion.max_points) || 0);
-  const current = clamp(Number(value) || 0, 0, max);
-
-  return (
-    <div className={`mb-3 rounded-12 border bg-white p-4 ${error ? "border-destructive" : "border-scout-border"}`}>
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <Label htmlFor={inputId} className="text-16 font-semibold text-scout-text">
-          {criterion.name}
-        </Label>
-        <span className="shrink-0 text-12 text-scout-text-muted">max {max} b.</span>
-      </div>
-
-      <NumberStepperInput
-        id={inputId}
-        max={max}
-        halfStep={allowHalfPoints}
-        value={current}
-        onChange={(event) => onChange(Number(event.target.value))}
-        aria-label={criterion.name}
-        aria-valuetext={`${current} z ${max} bodů`}
-      />
-      <FieldError message={error} />
-    </div>
-  );
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null;
-  }
-
-  return <p className="text-sm text-destructive">{message}</p>;
-}
-
 function createDefaultValues(criteria: StationCriterion[], existing: ScoreEntry | null): ScoreFormValues {
   return {
     points: seedPoints(criteria, existing),
@@ -293,14 +240,6 @@ function seedPoints(criteria: StationCriterion[], existing: ScoreEntry | null): 
     result[criterionFieldKey(c, index)] = found ? String(found.points) : "0";
   }
   return result;
-}
-
-function criterionFieldKey(criterion: StationCriterion, index: number) {
-  return criterion.id != null ? String(criterion.id) : `idx-${index}`;
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.min(hi, Math.max(lo, v));
 }
 
 function hasValidIncrement(value: number, allowHalfPoints: boolean) {

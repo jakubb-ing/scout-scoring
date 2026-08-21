@@ -31,10 +31,45 @@ defmodule Api.AuditLog do
     SurrealDB.query("CREATE audit_log SET #{set};", vars)
   end
 
-  def list_for_race(race_id, limit \\ 200) do
+  @default_limit 200
+  @max_limit 1000
+
+  @doc """
+  Výpis pro závod. `opts` přijímá `:action` (přesná shoda), `:limit`
+  a `:offset` — export historie změn si musí umět dojít i za prvních 200
+  záznamů, jinak by byl neúplný a nedal by se použít při námitce.
+  """
+  def list_for_race(race_id, opts \\ [])
+
+  def list_for_race(race_id, limit) when is_integer(limit) do
+    list_for_race(race_id, limit: limit)
+  end
+
+  def list_for_race(race_id, opts) when is_list(opts) do
+    limit = opts |> Keyword.get(:limit, @default_limit) |> clamp(1, @max_limit)
+    offset = opts |> Keyword.get(:offset, 0) |> clamp(0, 1_000_000)
+    action = Keyword.get(opts, :action)
+
+    {filter, vars} =
+      case action do
+        a when is_binary(a) and a != "" ->
+          {" AND action = $action", %{race: race_id, action: a}}
+
+        _ ->
+          {"", %{race: race_id}}
+      end
+
     SurrealDB.all(
-      "SELECT * FROM audit_log WHERE race = $race ORDER BY at DESC LIMIT #{limit};",
-      %{race: race_id}
+      """
+      SELECT * FROM audit_log
+      WHERE race = $race#{filter}
+      ORDER BY at DESC
+      LIMIT #{limit} START #{offset};
+      """,
+      vars
     )
   end
+
+  defp clamp(value, min, max) when is_integer(value), do: value |> max(min) |> min(max)
+  defp clamp(_value, min, _max), do: min
 end

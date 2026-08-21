@@ -36,6 +36,17 @@ defmodule Api.Scoring do
   end
 
   @doc """
+  Zápisy pro veřejnou výsledkovku. Nese `corrected_at` (odznak „upraveno"),
+  ale ne `corrected_by` ani `correction_reason` — důvod je interní
+  informace, která může zmiňovat konkrétní lidi.
+  """
+  def list_for_race_public(race_id) do
+    with {:ok, entries} <- list_for_race(race_id) do
+      {:ok, Enum.map(entries, &Map.drop(&1, ["corrected_by", "correction_reason", "submitted_by"]))}
+    end
+  end
+
+  @doc """
   Upsert a score entry. `actor` is "organizer:<id>" or "station:<id>".
   Blocks writes if race is closed.
   """
@@ -103,6 +114,102 @@ defmodule Api.Scoring do
     """
 
     SurrealDB.one(sql, vars |> Map.put(:id, entry_id) |> Map.put(:actor, actor))
+  end
+
+  @doc """
+  Dodatečná oprava bodů organizátorem — oddělená cesta, ne flag do
+  `upsert_entry` (povolení by se nesmělo prosáknout do station cesty).
+  Funguje výhradně u uzavřeného závodu a vyžaduje důvod.
+  """
+  def correct_entry(race_id, station_id, patrol_id, attrs, actor, reason) do
+    with :ok <- ensure_race_closed(race_id),
+         :ok <- ensure_reason(reason),
+         :ok <- ensure_patrol_belongs(race_id, patrol_id),
+         :ok <- ensure_station_belongs(race_id, station_id) do
+      before =
+        case get_entry(station_id, patrol_id) do
+          {:ok, e} -> e
+          _ -> nil
+        end
+
+      entry_result =
+        if before do
+          do_update(before["id"], attrs, actor)
+        else
+          do_create(race_id, station_id, patrol_id, attrs, actor)
+        end
+
+      with {:ok, entry} when is_map(entry) <- entry_result,
+           {:ok, corrected} when is_map(corrected) <-
+             SurrealDB.one(
+               """
+               UPDATE $id SET
+                 corrected_at = time::now(),
+                 corrected_by = type::string($actor),
+                 correction_reason = $reason;
+               """,
+               %{id: entry["id"], actor: actor, reason: reason}
+             ) do
+        AuditLog.log("score.correct", actor, race_id, entry["id"], %{
+          patrol: patrol_id,
+          station: station_id,
+          reason: reason,
+          before: before && before["scores"],
+          after: corrected["scores"],
+          before_total: total_points(before),
+          after_total: total_points(corrected),
+          race_state: "closed"
+        })
+
+        {:ok, corrected}
+      end
+    end
+  end
+
+  @doc "Smazání záznamu v rámci opravy — také jen u uzavřeného závodu, s důvodem."
+  def correct_delete(race_id, entry_id, actor, reason) do
+    with :ok <- ensure_race_closed(race_id),
+         :ok <- ensure_reason(reason),
+         {:ok, before} when is_map(before) <-
+           SurrealDB.one("SELECT * FROM $id WHERE race = $race;", %{id: entry_id, race: race_id}),
+         {:ok, _} <- SurrealDB.query("DELETE $id;", %{id: entry_id}) do
+      AuditLog.log("score.correct_delete", actor, race_id, entry_id, %{
+        patrol: before["patrol"],
+        station: before["station"],
+        reason: reason,
+        before: before["scores"],
+        before_total: total_points(before),
+        race_state: "closed"
+      })
+
+      :ok
+    else
+      {:ok, nil} -> {:error, :not_found}
+      {:error, _} = err -> err
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp total_points(nil), do: nil
+
+  defp total_points(entry) do
+    (entry["scores"] || [])
+    |> Enum.map(&(Map.get(&1, "points") || 0))
+    |> Enum.sum()
+  end
+
+  defp ensure_reason(reason) when is_binary(reason) do
+    if String.length(String.trim(reason)) >= 3, do: :ok, else: {:error, :reason_required}
+  end
+
+  defp ensure_reason(_), do: {:error, :reason_required}
+
+  defp ensure_race_closed(race_id) do
+    case SurrealDB.one("SELECT state FROM $id;", %{id: race_id}) do
+      {:ok, %{"state" => "closed"}} -> :ok
+      {:ok, %{"state" => _}} -> {:error, :race_not_closed}
+      _ -> {:error, :not_found}
+    end
   end
 
   def delete_entry(race_id, entry_id, actor) do
