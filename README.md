@@ -188,7 +188,7 @@ podepsat vlastní token.
 | proměnná | lokálně | produkce | k čemu |
 |---|---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8080` | veřejná URL API | kam míří requesty z prohlížeče |
-| `NEXT_PUBLIC_BUILD_SHA` | nepovinné | doporučené | git hash v patičce; u PWA odliší starou cache od neproběhlého nasazení |
+| `NEXT_PUBLIC_BUILD_SHA` | nastavovat netřeba | nastavovat netřeba | git hash v patičce; `next.config.ts` si ho vezme z proměnných CI (Vercel, GitHub Actions, Cloudflare, Render), jinak z gitu. Nastav ručně jen tam, kde build nemá ani jedno |
 
 `NEXT_PUBLIC_APP_VERSION` nastavovat netřeba — `next.config.ts` ji bere
 z `package.json`.
