@@ -9,6 +9,41 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 - `MINOR` pro nové zpětně kompatibilní funkce.
 - `PATCH` pro opravy chyb a drobné bezpečné úpravy.
 
+## [0.2.0](https://github.com/jakubb-ing/scout-scoring/compare/v0.1.0...v0.2.0) (2026-08-21)
+
+
+### Features
+
+* Add category badge component and integrate into patrols and score forms for improved category display ([89619e2](https://github.com/jakubb-ing/scout-scoring/commit/89619e2b6478c47316d0ae42c60c7bfd99a6a5ea))
+* Add coeditor of races, add login for stations, add admin roles, and more ([e043222](https://github.com/jakubb-ing/scout-scoring/commit/e043222dfddf02b8da5fe2885444a1c0a0e8ceb4))
+* Add phone icon link to organizer in station header ([a40ca58](https://github.com/jakubb-ing/scout-scoring/commit/a40ca58dd8367e42afd60ecc3a1b11fe3f036e5d))
+* add public /wiki page describing the app per role ([e0aa05d](https://github.com/jakubb-ing/scout-scoring/commit/e0aa05d508f32138cf172e374cf0a511cc628566))
+* add release-please versioning, app version in FE footer and /api/health ([9511533](https://github.com/jakubb-ing/scout-scoring/commit/951153322709b61bb8ea5604bd70cfba46cfb4fa))
+* Add results page and patrol results detail view with improved data handling and UI components ([8ee3b9d](https://github.com/jakubb-ing/scout-scoring/commit/8ee3b9d80f4c8bf76ab43e693d8da8866c24f1e3))
+* Enhance mobile and tablet dashboard UI with hamburger menu for race selection and settings ([79f2982](https://github.com/jakubb-ing/scout-scoring/commit/79f2982a597977b15974a057c3dcb202511423f2))
+* Implement allow_half_points feature for stations and update related components ([0b47d2b](https://github.com/jakubb-ing/scout-scoring/commit/0b47d2b8d00b9de102e3e2ac71b9db051fe454d7))
+* Implement public results access code feature for races ([383b6f0](https://github.com/jakubb-ing/scout-scoring/commit/383b6f0f299559185115e7e4fc84fd37beceedb2))
+* Introduce context-mode routing rules and rate limiting for login endpoints in API ([9380011](https://github.com/jakubb-ing/scout-scoring/commit/93800118919f37d9ced9d6018c82add6b3ea5c40))
+* offline station mode — PWA shell, persisted read cache and outbox ([6568ca0](https://github.com/jakubb-ing/scout-scoring/commit/6568ca033374a90c65a0a5e6881ef0cdcb4e87d7))
+* patrol feedback — offline form for accompanying adults with lock and audit ([1f609cd](https://github.com/jakubb-ing/scout-scoring/commit/1f609cdacad9d82402186e984d6fa55bc7b5f922))
+* race ready state — prepare/unprepare, idempotent PIN issuing, patrol withdrawal ([bfc3ce7](https://github.com/jakubb-ing/scout-scoring/commit/bfc3ce78b35203cb896ae333309f81ec9f6b1b42))
+* reorganize organizer dashboard ([e637299](https://github.com/jakubb-ing/scout-scoring/commit/e63729925ef34d7a7df02a335fc6da427159267a))
+* resolve the build sha automatically instead of requiring an env var ([05fa08e](https://github.com/jakubb-ing/scout-scoring/commit/05fa08e4fb2e4327c09212c85918c22b356f8125))
+* rework the judge flow and the organizer overview for faster scanning ([5d376f9](https://github.com/jakubb-ing/scout-scoring/commit/5d376f9f9f5031be9acf4f214067537e168b2a3e))
+* score corrections after race close with audit history UI ([9883b90](https://github.com/jakubb-ing/scout-scoring/commit/9883b901617326d246d7bc5449a9c4048470c1f9))
+* Update Fly.io configuration for API with improved machine management and concurrency settings ([455ae25](https://github.com/jakubb-ing/scout-scoring/commit/455ae25a7dc9c78a7d0af48e0e51f4ef3e45af6d))
+
+
+### Bug Fixes
+
+* 'Zkusit hned' on the waiting screen kicked the user to an error page ([67c3782](https://github.com/jakubb-ing/scout-scoring/commit/67c37825bea80903fdc030c9830eecca2be3b46d))
+* AI import was aborted after 8s by the shared apiFetch timeout ([9aea279](https://github.com/jakubb-ing/scout-scoring/commit/9aea279d01ccbdf47f8cfdab2e1cc464546d8164))
+* any edit of a race created before migration 008 returned 404 ([6f764aa](https://github.com/jakubb-ing/scout-scoring/commit/6f764aad27a122defef1f6df5f4c5caf2265e167))
+* fly.toml pointed at the wrong SurrealDB namespace ([a84caf5](https://github.com/jakubb-ing/scout-scoring/commit/a84caf56a97d442952bfa2ea2aaea819831f0c7d))
+* improve feedback and patrol addition UI in PatrolsTab component ([549b8b7](https://github.com/jakubb-ing/scout-scoring/commit/549b8b711a0f720a7baf2d363d9e7f714fc49fd7))
+* refuse to boot in production without explicit SurrealDB config ([033a48c](https://github.com/jakubb-ing/scout-scoring/commit/033a48c97fee32cc00291d87f82783760857dc84))
+* stop the built service worker from leaking into dev ([fb7a118](https://github.com/jakubb-ing/scout-scoring/commit/fb7a1180f0a6f53e6f7c2d19226a8cae95acd360))
+
 ## [Unreleased]
 
 ### Added
