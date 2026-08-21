@@ -52,32 +52,38 @@ export default function StationPage() {
 
   // QR URLs carry only station id + PIN. Exchange them once for a station
   // token, then use the stored token for regular station API calls.
+  // Stejnou cestu používá i tlačítko „Zkusit hned" na obrazovce čekání —
+  // chyba se přepisuje až výsledkem nového pokusu, aby se mezitím
+  // neobjevila hláška o chybějícím PINu.
+  const attemptLogin = React.useCallback(async () => {
+    if (!pinFromUrl) return;
+
+    loginAttemptedForPin.current = `${stationId}:${pinFromUrl}`;
+    setPinExchangeState("pending");
+
+    try {
+      const res = await loginStation({ stationId, pin: pinFromUrl });
+      tokens.set("station", res.token);
+      window.localStorage.setItem(LAST_STATION_KEY, stationId);
+      qc.invalidateQueries({ queryKey: qk.stationScope(stationId) });
+      // Zápisy zablokované na 401 (reset PINu) se po re-loginu vrací
+      // do fronty — re-login outbox nikdy nemaže.
+      void resumeAuthBlocked(stationChainKey(stationId));
+      setLoginError(null);
+      setLoginToken(res.token);
+      setPinExchangeState("success");
+    } catch (err) {
+      setLoginError(err);
+      setPinExchangeState("error");
+    }
+  }, [pinFromUrl, stationId, loginStation, qc]);
+
   useEffect(() => {
     const loginAttemptKey = pinFromUrl ? `${stationId}:${pinFromUrl}` : null;
     if (!pinFromUrl || !loginAttemptKey || loginToken || loginAttemptedForPin.current === loginAttemptKey) return;
 
-    loginAttemptedForPin.current = loginAttemptKey;
-    setLoginError(null);
-    setPinExchangeState("pending");
-
-    loginStation({ stationId, pin: pinFromUrl })
-      .then((res) => {
-        if (loginAttemptedForPin.current !== loginAttemptKey) return;
-        tokens.set("station", res.token);
-        window.localStorage.setItem(LAST_STATION_KEY, stationId);
-        qc.invalidateQueries({ queryKey: qk.stationScope(stationId) });
-        // Zápisy zablokované na 401 (reset PINu) se po re-loginu vrací
-        // do fronty — re-login outbox nikdy nemaže.
-        void resumeAuthBlocked(stationChainKey(stationId));
-        setLoginToken(res.token);
-        setPinExchangeState("success");
-      })
-      .catch((err) => {
-        if (loginAttemptedForPin.current !== loginAttemptKey) return;
-        setLoginError(err);
-        setPinExchangeState("error");
-      });
-  }, [pinFromUrl, loginToken, stationId, loginStation, qc]);
+    void attemptLogin();
+  }, [pinFromUrl, loginToken, stationId, attemptLogin]);
 
   const hasStoredStationToken = !pinFromUrl && Boolean(tokens.get("station"));
   const hasStationToken = Boolean(loginToken || hasStoredStationToken);
@@ -171,15 +177,7 @@ export default function StationPage() {
         raceName={notStarted.raceName}
         stationName={notStarted.stationName}
         entityLabel="Stanoviště"
-        onRetry={async () => {
-          if (pinFromUrl) {
-            // Uvolnit guard a nechat login effect proběhnout znovu.
-            loginAttemptedForPin.current = null;
-            setLoginError(null);
-          } else {
-            await refetchStationMe();
-          }
-        }}
+        onRetry={pinFromUrl ? attemptLogin : async () => void (await refetchStationMe())}
       />
     );
   }

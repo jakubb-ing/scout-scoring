@@ -65,28 +65,36 @@ export default function FeedbackPage() {
   const [pinExchangeState, setPinExchangeState] = useState<PinExchangeState>("idle");
   const loginAttemptedForPin = useRef<string | null>(null);
 
+  // Jedna cesta k výměně PINu za token — používá ji první průchod
+  // i opakovaný pokus z obrazovky „závod nebyl spuštěn". Chyba se
+  // přepisuje až výsledkem nového pokusu, jinak by se obrazovka mezitím
+  // přepnula na „chybí PIN".
+  const attemptLogin = useCallback(async () => {
+    if (!pinFromUrl) return;
+
+    const attemptKey = `${patrolId}:${pinFromUrl}`;
+    loginAttemptedForPin.current = attemptKey;
+    setPinExchangeState("pending");
+
+    try {
+      const res = await loginFeedback({ patrolId, pin: pinFromUrl });
+      tokens.set("feedback", res.token);
+      qc.invalidateQueries({ queryKey: qk.feedbackScope(patrolId) });
+      setLoginError(null);
+      setLoginToken(res.token);
+      setPinExchangeState("success");
+    } catch (err) {
+      setLoginError(err);
+      setPinExchangeState("error");
+    }
+  }, [pinFromUrl, patrolId, loginFeedback, qc]);
+
   useEffect(() => {
     const attemptKey = pinFromUrl ? `${patrolId}:${pinFromUrl}` : null;
     if (!pinFromUrl || !attemptKey || loginToken || loginAttemptedForPin.current === attemptKey) return;
 
-    loginAttemptedForPin.current = attemptKey;
-    setLoginError(null);
-    setPinExchangeState("pending");
-
-    loginFeedback({ patrolId, pin: pinFromUrl })
-      .then((res) => {
-        if (loginAttemptedForPin.current !== attemptKey) return;
-        tokens.set("feedback", res.token);
-        qc.invalidateQueries({ queryKey: qk.feedbackScope(patrolId) });
-        setLoginToken(res.token);
-        setPinExchangeState("success");
-      })
-      .catch((err) => {
-        if (loginAttemptedForPin.current !== attemptKey) return;
-        setLoginError(err);
-        setPinExchangeState("error");
-      });
-  }, [pinFromUrl, loginToken, patrolId, loginFeedback, qc]);
+    void attemptLogin();
+  }, [pinFromUrl, loginToken, patrolId, attemptLogin]);
 
   const hasStoredToken = !pinFromUrl && Boolean(tokens.get("feedback"));
   const hasToken = Boolean(loginToken || hasStoredToken);
@@ -113,14 +121,7 @@ export default function FeedbackPage() {
         raceName={notStarted.raceName}
         stationName={notStarted.patrolName}
         entityLabel="Hlídka"
-        onRetry={async () => {
-          if (pinFromUrl) {
-            loginAttemptedForPin.current = null;
-            setLoginError(null);
-          } else {
-            await refetchMe();
-          }
-        }}
+        onRetry={pinFromUrl ? attemptLogin : async () => void (await refetchMe())}
       />
     );
   }
