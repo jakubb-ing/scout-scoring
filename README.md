@@ -49,7 +49,8 @@ Prerekvizita: Elixir 1.19+, Erlang/OTP 28+, SurrealDB 3.x CLI.
    make api-server
    ```
 
-   Běží na `http://127.0.0.1:4000`. `GET /api/health` vrací `{"status":"ok","db":"ok"}`.
+   Běží na `http://127.0.0.1:8080` (port z `PORT`, default v `config/dev.exs`).
+   `GET /api/health` vrací `{"status":"ok","db":"ok","version":"0.1.0"}`.
 
 5. **Spusť frontend** (třetí terminál):
 
@@ -69,6 +70,44 @@ Prerekvizita: Elixir 1.19+, Erlang/OTP 28+, SurrealDB 3.x CLI.
 
 Tři terminály: `make db-local`, `make api-server`, `make web-dev`.
 Poprvé navíc `make setup && make api-migrate && make api-seed`.
+
+## Proměnné prostředí
+
+API je čte přes Dotenvy z `apps/api/.env` (shell má přednost), web z
+`apps/web/.env` — a protože `NEXT_PUBLIC_*` se zapékají do buildu, musí
+být nastavené **v době buildu**, ne až za běhu.
+
+### API (`apps/api/.env`)
+
+| proměnná | lokálně | produkce | k čemu |
+|---|---|---|---|
+| `SURREAL_URL` | `http://127.0.0.1:8000` | adresa instance | připojení k DB |
+| `SURREAL_NS` / `SURREAL_DB` | `scout` / `scoring` | totéž | namespace a databáze |
+| `SURREAL_USER` / `SURREAL_PASS` | `root` / `root` | **vlastní údaje** | přihlášení k DB |
+| `PORT` | `8080` | `8080` (fly.toml) | port HTTP serveru |
+| `PHX_HOST` | nepovinné | doména API | generování URL |
+| `PHX_SERVER` | — | `true` | v release musí zapnout server |
+| `SECRET_KEY_BASE` | nepovinné | **povinné** | podpis cookies; `mix phx.gen.secret` |
+| `GUARDIAN_SECRET` | nepovinné (dev default) | **povinné** | podpis JWT organizátorů |
+| `STATION_TOKEN_SECRET` | nepovinné (dev default) | **povinné** | podpis tokenů stanovišť i doprovodu |
+| `OPENAI_API_KEY` | jen pro AI import | jen pro AI import | bez něj AI import spadne, zbytek appky běží |
+| `OPENAI_MODEL` | nepovinné | nepovinné | default `gpt-5-mini` |
+| `DNS_CLUSTER_QUERY` | — | nepovinné | clustering na fly.io |
+| `SEED_EMAIL` / `SEED_PASS` / `SEED_NAME` | pro `make api-seed` | jednorázově | první organizátor |
+
+Bez `GUARDIAN_SECRET` a `STATION_TOKEN_SECRET` produkční start **záměrně
+spadne** — jinak by se tiše použily dev defaulty a kdokoli by si mohl
+podepsat vlastní token.
+
+### Web (`apps/web/.env`)
+
+| proměnná | lokálně | produkce | k čemu |
+|---|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8080` | veřejná URL API | kam míří requesty z prohlížeče |
+| `NEXT_PUBLIC_BUILD_SHA` | nepovinné | doporučené | git hash v patičce; u PWA odliší starou cache od neproběhlého nasazení |
+
+`NEXT_PUBLIC_APP_VERSION` nastavovat netřeba — `next.config.ts` ji bere
+z `package.json`.
 
 ## Testy
 
