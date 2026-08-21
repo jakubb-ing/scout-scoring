@@ -21,8 +21,10 @@ kill_signal = 'SIGTERM'
   PORT = '8080'
   # Release se spouští jako `bin/api start`, který sám server nezapíná.
   PHX_SERVER = 'true'
-  SURREAL_NS = 'scout'
-  SURREAL_DB = 'scoring'
+  # Musí sedět s produkční instancí — jinak by migrace založily prázdný
+  # namespace a aplikace by naběhla nad prázdnou databází.
+  SURREAL_NS = 'scout_scoring'
+  SURREAL_DB = 'scout_scoring'
 
 [http_service]
   internal_port = 8080
