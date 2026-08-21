@@ -1,4 +1,11 @@
 import { apiFetch } from "./client";
+
+// Extrakce z dokumentu jde přes OpenAI a běžně trvá desítky sekund —
+// výchozích 8 s z apiFetch by ji utnulo dřív, než dorazí odpověď.
+// Vypršení tohohle timeoutu neznamená ztrátu sítě, takže se nepromítá
+// do offline stavu aplikace.
+const AI_EXTRACT_TIMEOUT_MS = 180_000;
+const AI_REFINE_TIMEOUT_MS = 120_000;
 import type {
   AiImportExtractResponse,
   AiImportRefineResponse,
@@ -21,6 +28,8 @@ export async function extractStationsFromDocument(
     method: "POST",
     scope: "organizer",
     body: form,
+    timeoutMs: AI_EXTRACT_TIMEOUT_MS,
+    reportOffline: false,
   });
 }
 
@@ -36,5 +45,7 @@ export async function refineStations(
     method: "POST",
     scope: "organizer",
     body: args,
+    timeoutMs: AI_REFINE_TIMEOUT_MS,
+    reportOffline: false,
   });
 }

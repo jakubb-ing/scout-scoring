@@ -16,6 +16,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
 
 // Na louce je reálný scénář flaky síť, ne tvrdý offline — bez timeoutu
 // appka na slabém signálu visí desítky sekund místo pádu do offline větve.
+// Volání, která legitimně trvají déle (AI import), si posílají vlastní
+// `timeoutMs`; osm sekund je limit pro běžné CRUD, ne pro práci na pozadí.
 const REQUEST_TIMEOUT_MS = 8_000;
 
 export type TokenScope = "organizer" | "station" | "feedback";
@@ -31,6 +33,13 @@ interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   scope?: TokenScope;
   body?: unknown;
   tokenOverride?: string;
+  /** Vlastní timeout v ms; `null` znamená bez timeoutu. */
+  timeoutMs?: number | null;
+  /**
+   * Má se selhání brát jako signál „jsme offline"? U dlouhých operací ne —
+   * vypršení jejich timeoutu znamená pomalou odpověď, ne ztrátu sítě.
+   */
+  reportOffline?: boolean;
 }
 
 const STORAGE_KEYS: Record<TokenScope, string> = {
@@ -55,7 +64,15 @@ export const tokens = {
 };
 
 export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { scope, body, headers, tokenOverride, ...rest } = options;
+  const {
+    scope,
+    body,
+    headers,
+    tokenOverride,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+    reportOffline = true,
+    ...rest
+  } = options;
   const url = `${API_URL}${path}`;
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
@@ -76,7 +93,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
     res = await fetch(url, {
       ...rest,
       headers: h,
-      signal: rest.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: rest.signal ?? (timeoutMs == null ? undefined : AbortSignal.timeout(timeoutMs)),
       body:
         body === undefined
           ? undefined
@@ -86,7 +103,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
       cache: "no-store",
     });
   } catch (err) {
-    reportNetworkFailure();
+    if (reportOffline) reportNetworkFailure();
     throw err;
   }
   reportNetworkSuccess();

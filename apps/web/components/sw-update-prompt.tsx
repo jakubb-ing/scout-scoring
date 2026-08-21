@@ -12,6 +12,23 @@ export function SwUpdatePrompt() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
+    // V dev buildu se service worker negeneruje, ale ten z dřívějšího
+    // produkčního buildu na stejném originu zůstane zaregistrovaný a dál
+    // odchytává requesty — projeví se to jako `no-response` a zrušené
+    // volání, které vůbec nedorazí na server. Odregistrovat.
+    if (process.env.NODE_ENV !== "production") {
+      void navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+        if (registrations.length === 0) return;
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+        if (typeof caches !== "undefined") {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+        window.location.reload();
+      });
+      return;
+    }
+
     let reloading = false;
     const onControllerChange = () => {
       if (reloading) return;
