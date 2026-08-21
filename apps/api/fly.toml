@@ -15,9 +15,14 @@ kill_signal = 'SIGTERM'
   # a aplikované migrace jsou v tabulce `_migration`.
   release_command = "/app/bin/api eval 'Api.DB.Migrate.run()'"
 
+# Nic tajného — tohle je v gitu. Tajné hodnoty patří do `fly secrets set`.
 [env]
   PHX_HOST = 'api-scout-scoring.fly.dev'
   PORT = '8080'
+  # Release se spouští jako `bin/api start`, který sám server nezapíná.
+  PHX_SERVER = 'true'
+  SURREAL_NS = 'scout'
+  SURREAL_DB = 'scoring'
 
 [http_service]
   internal_port = 8080

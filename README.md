@@ -101,6 +101,53 @@ bez `SEED_*` proměnných by založil účet se známým heslem. Jednorázově:
 fly ssh console -C "/app/bin/api eval 'Api.DB.Seed.run()'"
 ```
 
+### Konfigurace na fly.io
+
+`.env` soubory jsou **jen pro lokální vývoj**. Do image se nedostanou —
+Dockerfile kopíruje pouze `mix.exs`, `config`, `lib` a `priv`, a `.env`
+je navíc v `.dockerignore` i v `.gitignore`. Na produkci se konfiguruje
+takhle:
+
+**Veřejné hodnoty → `fly.toml`, sekce `[env]`.** Je v gitu, takže sem
+patří jen to, co může kdokoli vidět: `PHX_HOST`, `PORT`, `PHX_SERVER`,
+`SURREAL_NS`, `SURREAL_DB`.
+
+**Tajné hodnoty → `fly secrets`.** Ukládají se zašifrovaně a do stroje
+se vkládají jako proměnné prostředí za běhu:
+
+```
+fly secrets set -a api-scout-scoring \
+  SECRET_KEY_BASE="$(mix phx.gen.secret)" \
+  GUARDIAN_SECRET="$(mix phx.gen.secret)" \
+  STATION_TOKEN_SECRET="$(mix phx.gen.secret)" \
+  SURREAL_URL="https://…" \
+  SURREAL_USER="…" \
+  SURREAL_PASS="…" \
+  OPENAI_API_KEY="sk-…"
+```
+
+Hromadně z lokálního souboru (řádky `KLÍČ=hodnota`):
+
+```
+fly secrets import -a api-scout-scoring < apps/api/.env.production
+```
+
+Kontrola (vypíše jen názvy a otisky, ne hodnoty) a smazání:
+
+```
+fly secrets list -a api-scout-scoring
+fly secrets unset -a api-scout-scoring STARY_KLIC
+```
+
+Každá změna secrets spustí rolling restart, takže proběhne i
+`release_command` s migracemi. Když jich měníš víc najednou, nastav je
+jedním příkazem — ne postupně, ať se aplikace nerestartuje pokaždé.
+
+> **Pozor na jméno souboru:** `config/runtime.exs` načítá `.env` a
+> `.env.<MIX_ENV>`, tedy `.env.prod`. Soubor `.env.production` se
+> **nenačte nikdy** — na produkci to nevadí (tam se stejně nepoužívá),
+> ale lokální `MIX_ENV=prod` běh z něj nic nepřečte.
+
 ### Pořadí při změně schématu
 
 Migrace jsou aditivní (`DEFINE … IF NOT EXISTS`, u změny asserce
