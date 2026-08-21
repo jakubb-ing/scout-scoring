@@ -155,13 +155,14 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
             {patrols.length} hlídek · očekává se 10–25 v okresním kole.
           </p>
         </div>
-        {feedbackEnabled ? (
+        <div className="flex gap-2">
+        {feedbackEnabled && (
           <Button variant="outline" onClick={() => setFeedbackCardsOpen(true)} disabled={patrols.length === 0}>
             <QrCode className="h-4 w-4" />
             QR pro doprovod
           </Button>
-        ) : null}
-        {canAdd ? (
+        )}
+        {canAdd && (
           <div className="flex gap-2">
             <Button variant="outline" asChild>
               <label className="cursor-pointer">
@@ -175,15 +176,8 @@ export function PatrolsTab({ raceId }: { raceId: string }) {
               Přidat hlídku
             </Button>
           </div>
-        ) : race ? (
-          <p className="text-12 text-scout-text-muted">
-            {race.state === "ready"
-              ? "Závod je připraven — jde upravit jen název a členové, přidávání je zamčené."
-              : race.state === "active"
-                ? "Závod je spuštěný — hlídky jde jen stáhnout ze závodu."
-                : "Závod je uzavřený — hlídky už nejdou upravovat."}
-          </p>
-        ) : null}
+        )}
+        </div>
       </div>
 
       {patrolsLoading ? (
@@ -384,9 +378,23 @@ function FeedbackCardsDialog({
   const renderCard = (p: Patrol & { qr_url?: string }) => (
     <div key={p.id} className="login-card flex items-center gap-4 rounded-lg border border-border p-4">
       {p.qr_url ? (
-        <div className="grid h-32 w-32 shrink-0 place-items-center rounded-md border border-border bg-white p-2 print:h-36 print:w-36">
+           <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(p.qr_url!);
+              toast.success("Odkaz zkopírován.");
+            } catch {
+              toast.error("Kopírování selhalo.");
+            }
+          }}
+          className="grid h-32 w-32 shrink-0 place-items-center rounded-md border border-border bg-white p-2 transition hover:ring-2 hover:ring-ring print:h-36 print:w-36 print:hover:ring-0"
+          aria-label="Zkopírovat odkaz"
+          title="Klikni pro zkopírování odkazu"
+        >
           <QRCodeSVG value={p.qr_url} size={112} level="M" marginSize={1} className="print:h-32 print:w-32" />
-        </div>
+          </button>
+     
       ) : (
         <div className="grid h-32 w-32 shrink-0 place-items-center rounded-md border border-border bg-secondary text-xs text-muted-foreground print:h-36 print:w-36">
           <span>QR</span>
