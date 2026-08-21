@@ -35,12 +35,33 @@ if System.get_env("PHX_SERVER") do
   config :api, ApiWeb.Endpoint, server: true
 end
 
-config :api, Api.SurrealDB,
-  url: System.get_env("SURREAL_URL", "http://127.0.0.1:8000"),
-  namespace: System.get_env("SURREAL_NS", "scout"),
-  database: System.get_env("SURREAL_DB", "scoring"),
-  user: System.get_env("SURREAL_USER", "root"),
-  pass: System.get_env("SURREAL_PASS", "root")
+if config_env() == :prod do
+  # Bez explicitní konfigurace by se použily vývojové defaulty a aplikace
+  # by naběhla nad úplně jinou (prázdnou) databází — migrace si chybějící
+  # namespace samy vytvoří, takže by to navenek vypadalo jako ztráta dat.
+  # Spadnout je tady jednoznačně lepší.
+  surreal = fn name ->
+    System.get_env(name) ||
+      raise """
+      environment variable #{name} is missing.
+      Set it with: fly secrets set #{name}=… -a <app>
+      """
+  end
+
+  config :api, Api.SurrealDB,
+    url: surreal.("SURREAL_URL"),
+    namespace: surreal.("SURREAL_NS"),
+    database: surreal.("SURREAL_DB"),
+    user: surreal.("SURREAL_USER"),
+    pass: surreal.("SURREAL_PASS")
+else
+  config :api, Api.SurrealDB,
+    url: System.get_env("SURREAL_URL", "http://127.0.0.1:8000"),
+    namespace: System.get_env("SURREAL_NS", "scout"),
+    database: System.get_env("SURREAL_DB", "scoring"),
+    user: System.get_env("SURREAL_USER", "root"),
+    pass: System.get_env("SURREAL_PASS", "root")
+end
 
 if config_env() == :prod do
   # In production both signing secrets are mandatory. Without them the app
