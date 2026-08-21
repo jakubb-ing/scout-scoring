@@ -10,6 +10,10 @@ kill_signal = 'SIGTERM'
 [build]
 
 [deploy]
+  # Migrace se aplikují jednou, před spuštěním nové verze. Selhání
+  # zastaví deploy a nechá běžet starou verzi. Schéma je idempotentní
+  # a aplikované migrace jsou v tabulce `_migration`.
+  release_command = "/app/bin/api eval 'Api.DB.Migrate.run()'"
 
 [env]
   PHX_HOST = 'api-scout-scoring.fly.dev'

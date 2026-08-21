@@ -71,6 +71,43 @@ Prerekvizita: Elixir 1.19+, Erlang/OTP 28+, SurrealDB 3.x CLI.
 Tři terminály: `make db-local`, `make api-server`, `make web-dev`.
 Poprvé navíc `make setup && make api-migrate && make api-seed`.
 
+## Nasazení a migrace
+
+Schéma mění **`release_command` z `apps/api/fly.toml`**:
+
+```
+release_command = "/app/bin/api eval 'Api.DB.Migrate.run()'"
+```
+
+Fly ho pustí po buildu nové image, na jednom dočasném stroji, **před**
+spuštěním nové verze. Když migrace selže, deploy se zastaví a dál běží
+stará verze. Aplikované migrace jsou v tabulce `_migration`, opakovaný
+běh je no-op, takže je jedno, kolikrát se deploy zopakuje.
+
+Migrace se proto **nepouštějí při startu aplikace** (`run_migrations_on_start:
+false` v `config/prod.exs`) — dva souběžně startující stroje by si navzájem
+shodily zápis do `_migration`, který má na názvu UNIQUE index.
+
+Ruční spuštění, kdyby bylo potřeba:
+
+```
+fly ssh console -C "/app/bin/api eval 'Api.DB.Migrate.run()'"
+```
+
+Seed prvního organizátora se na produkci taky nespouští automaticky —
+bez `SEED_*` proměnných by založil účet se známým heslem. Jednorázově:
+
+```
+fly ssh console -C "/app/bin/api eval 'Api.DB.Seed.run()'"
+```
+
+### Pořadí při změně schématu
+
+Migrace jsou aditivní (`DEFINE … IF NOT EXISTS`, u změny asserce
+`OVERWRITE`), takže nová verze API vidí nové sloupce a stará je ignoruje.
+Frontend se nasazuje zvlášť — pokud nová funkce potřebuje nové API,
+nasaď nejdřív backend.
+
 ## Proměnné prostředí
 
 API je čte přes Dotenvy z `apps/api/.env` (shell má přednost), web z
