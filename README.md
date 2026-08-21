@@ -51,6 +51,37 @@ Prerekvizita: Elixir 1.19+, Erlang/OTP 28+, SurrealDB 3.x CLI.
 
    Běží na `http://127.0.0.1:4000`. `GET /api/health` vrací `{"status":"ok","db":"ok"}`.
 
+5. **Spusť frontend** (třetí terminál):
+
+   ```
+   make web-setup   # jednorázově: npm install + .env z .env.example
+   make web-dev
+   ```
+
+   Běží na `http://127.0.0.1:3000`, API si bere z `NEXT_PUBLIC_API_URL`
+   v `apps/web/.env`. Organizátor se přihlásí na `/login` údaji ze seedu,
+   rozhodčí jdou na `/station`.
+
+   Offline režim (service worker) je v dev buildu vypnutý — ověřuje se
+   na `make web-build && cd apps/web && npm start`.
+
+### Zkráceně
+
+Tři terminály: `make db-local`, `make api-server`, `make web-dev`.
+Poprvé navíc `make setup && make api-migrate && make api-seed`.
+
+## Testy
+
+```
+make test          # vše, co nepotřebuje databázi (API + web)
+make test-db       # API testy proti běžící SurrealDB (make db-local)
+make test-web      # jen vitest
+```
+
+DB testy jsou tagované `:db` a ve výchozím běhu vyloučené, takže
+`make test` projde i bez spuštěné databáze. Podrobnosti v
+`docs/testing-plan.md`.
+
 ## Verzování a changelog
 
 Verze posouvá **release-please** (GitHub Action): čte konvenční commity na

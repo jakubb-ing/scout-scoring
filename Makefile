@@ -1,4 +1,4 @@
-.PHONY: help db-local api-setup api-migrate api-seed api-server api-test test test-api test-db test-web version-show
+.PHONY: help setup dev db-local api-setup api-migrate api-seed api-server api-test web-setup web-dev web-build test test-api test-db test-web version-show
 
 help:
 	@echo "Scout Scoring — monorepo"
@@ -9,8 +9,15 @@ help:
 	@echo "  make api-seed       Create first organizer (SEED_EMAIL, SEED_PASS env)"
 	@echo "  make api-server     Run Phoenix on :4000"
 	@echo "  make api-test       Run API tests"
+	@echo "  make web-setup      Install web dependencies"
+	@echo "  make web-dev        Run Next.js dev server on :3000"
+	@echo "  make web-build      Production build of the web app"
 	@echo "  make test           All tests that do not need a database (api + web)"
 	@echo "  make test-db        API tests against a running SurrealDB (make db-local)"
+	@echo ""
+	@echo "Local run — three terminals:"
+	@echo "  1) make db-local    2) make api-server    3) make web-dev"
+	@echo "  First time: make setup && make api-migrate && make api-seed"
 	@echo ""
 	@echo "Prod: DB runs as a separate surrealdb instance (fly.io), configured via"
 	@echo "SURREAL_URL / SURREAL_NS / SURREAL_DB / SURREAL_USER / SURREAL_PASS env vars."
@@ -18,6 +25,9 @@ help:
 db-local:
 	@mkdir -p /tmp/scout-surreal
 	surreal start --user root --pass root --bind 127.0.0.1:8000 --log info "rocksdb:/tmp/scout-surreal/scoring.db"
+
+# První spuštění: závislosti API i webu a .env pro web.
+setup: api-setup web-setup
 
 api-setup:
 	cd apps/api && mix deps.get && mix compile
@@ -30,6 +40,16 @@ api-seed:
 
 api-server:
 	cd apps/api && mix phx.server
+
+web-setup:
+	cd apps/web && npm install
+	@test -f apps/web/.env || cp apps/web/.env.example apps/web/.env
+
+web-dev:
+	cd apps/web && npm run dev
+
+web-build:
+	cd apps/web && npm run build
 
 api-test: test-api
 
