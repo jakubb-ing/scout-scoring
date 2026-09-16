@@ -66,7 +66,7 @@ export function RaceSelector({
   }
 
   const selectTriggerClass = variant === "header"
-    ? "h-8 w-[300px] rounded-8 border border-white/20 bg-white/10 px-3 text-13 font-medium text-white shadow-none data-[placeholder]:text-white/60"
+    ? "h-8 min-w-[200px] max-w-[400px] rounded-8 border border-white/20 bg-white/10 px-3 text-13 font-medium text-white shadow-none data-[placeholder]:text-white/60"
     : "h-9 w-full rounded-8 border border-scout-border bg-white px-3 text-13 font-medium text-scout-text shadow-none";
   const buttonClass = variant === "header"
     ? "border-white/20 bg-white/10 text-white/85 hover:bg-white/15 hover:text-white"
@@ -86,7 +86,7 @@ export function RaceSelector({
                 <SelectItem key={r.id} value={r.id}>
                   <span className="flex items-center gap-2">
                     {r.name}
-                    <Badge variant={s.variant} className="text-[10px] px-1 py-0.30">{s.label}</Badge>
+                    <Badge variant={s.variant} className="text-[10px] px-1 py-0.5">{s.label}</Badge>
                   </span>
                 </SelectItem>
               );

@@ -164,7 +164,10 @@ function PatrolRow({
     >
       <span
         className={cn(
-          "grid h-11.5 w-11.5 shrink-0 place-items-center rounded-10 text-18 font-bold tabular-nums text-white",
+          // h-11/w-11 musí zůstat stejné, jinak z kruhu vyjde ovál. Dřív tu
+          // bylo h-11.5/w-11.5, jenže 11.5 v paletě není, takže se rozměr
+          // vůbec nevykreslil a odznak se scvrkl na šířku číslice.
+          "grid h-11 w-11 shrink-0 place-items-center rounded-full text-18 font-bold tabular-nums text-white",
           done ? (pending ? "bg-scout-yellow text-scout-text" : "bg-scout-green") : "bg-scout-blue"
         )}
       >
