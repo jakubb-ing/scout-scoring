@@ -176,6 +176,22 @@ const SECTIONS: Section[] = [
         ],
       },
       {
+        kind: "table",
+        title: "Krok bodování na stanovišti",
+        head: ["Krok", "Kdy se hodí"],
+        rows: [
+          ["1 bod", "Výchozí volba. Rozhodčí zadává jen celá čísla."],
+          ["0,5 bodu", "Když se běžně uděluje půlbod za úkol splněný jen zčásti."],
+          ["0,25 bodu", "Nejjemnější hodnocení, typicky u kritérií s nízkým maximem."],
+        ],
+      },
+      {
+        kind: "note",
+        tone: "warn",
+        body:
+          "Krok se nastavuje u každého stanoviště zvlášť a jde změnit i za běhu závodu. Už zapsané body se tím ale nepřepočítají: hodnocení se 2,5 body zůstane, jak bylo, a po přepnutí stanoviště na celé body ho formulář při další úpravě odmítne, dokud ho rozhodčí nesrovná na nový krok.",
+      },
+      {
         kind: "list",
         title: "Import stanovišť pomocí AI",
         items: [
@@ -209,7 +225,7 @@ const SECTIONS: Section[] = [
           {
             name: "Zápis bodů",
             body:
-              "Formulář s kritérii daného stanoviště. Body se zadávají po kroku nastaveném na stanovišti: celé body, půlbody nebo čtvrtbody. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
+              "Formulář s kritérii daného stanoviště. Body se zadávají po kroku nastaveném na stanovišti: celé body, půlbody nebo čtvrtbody. U každého kritéria jsou tlačítka se znaménkem — červená ubírá, zelená přidává. Vedle drobného kroku je u větších kritérií ještě větší skok, aby se vysoké hodnocení nemuselo naklikat po kouscích. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
           },
           {
             name: "Odeslání",
