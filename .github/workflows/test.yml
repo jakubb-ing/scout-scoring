@@ -10,21 +10,6 @@ jobs:
     name: API (ExUnit + SurrealDB)
     runs-on: ubuntu-latest
 
-    services:
-      surrealdb:
-        image: surrealdb/surrealdb:v3.0.0
-        ports:
-          - 8000:8000
-        options: >-
-          --health-cmd "/surreal is-ready"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-        env:
-          SURREAL_USER: root
-          SURREAL_PASS: root
-          SURREAL_PATH: memory
-
     env:
       MIX_ENV: test
       SURREAL_URL: http://127.0.0.1:8000
@@ -33,6 +18,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # SurrealDB nejde spustit přes `services:`. Obraz má entrypoint
+      # `/surreal` a bez podpříkazu jen vypíše nápovědu a skončí; služby
+      # v Actions přitom argumenty předat neumí, takže se kontejner vždy
+      # vyhodnotil jako unhealthy a job spadl na „One or more containers
+      # failed to start". Spouštíme ji proto krokem, kde `start` předat lze.
+      - name: Start SurrealDB
+        run: |
+          docker run -d --name surrealdb -p 8000:8000 surrealdb/surrealdb:v3.0.0 \
+            start --user root --pass root --bind 0.0.0.0:8000 memory
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+              echo "SurrealDB je připravená po ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "SurrealDB nenaběhla do 30s, log kontejneru:"
+          docker logs surrealdb
+          exit 1
 
       - uses: erlef/setup-beam@v1
         with:
@@ -56,7 +61,7 @@ jobs:
         working-directory: apps/api
         run: mix compile --warnings-as-errors
 
-      # Včetně DB testů — služba SurrealDB běží výš.
+      # Včetně DB testů — SurrealDB běží v kontejneru z kroku výš.
       - name: Test
         working-directory: apps/api
         run: mix test --include db

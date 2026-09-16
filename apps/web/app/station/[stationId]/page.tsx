@@ -27,7 +27,7 @@ import { useIsOffline } from "@/lib/offline/online";
 import { useOutboxStatus } from "@/lib/offline/hooks";
 import { clearOutbox, resumeAuthBlocked } from "@/lib/offline/outbox";
 import { stationChainKey, pendingEntryFromPayload, type StationScorePayload } from "@/lib/offline/register";
-import type { Patrol, ScoreEntry } from "@/lib/api/types";
+import { toPointStep, type Patrol, type ScoreEntry } from "@/lib/api/types";
 import { useEffect, useMemo, useState } from "react";
 
 type Mode = "pick" | "score";
@@ -309,7 +309,7 @@ export default function StationPage() {
               stationName={station.name}
               patrol={selected}
               criteria={station.criteria.map((c, index) => ({ ...c, id: index }))}
-              allowHalfPoints={station.allow_half_points === true}
+              pointStep={toPointStep(station.point_step)}
               existing={existingForSelected}
               onSaved={() => onSaved(selected.id)}
               onCancel={backToList}

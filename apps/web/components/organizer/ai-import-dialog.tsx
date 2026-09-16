@@ -14,12 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { PointStepSelect } from "@/components/organizer/point-step-select";
 import { extractStationsFromDocument, refineStations } from "@/lib/api/ai-import";
-import type {
-  AiImportQuestion,
-  AiImportStationDraft,
-  StationCriterion,
+import {
+  toPointStep,
+  type AiImportQuestion,
+  type AiImportStationDraft,
+  type StationCriterion,
 } from "@/lib/api/types";
 import { useBulkCreateStations } from "@/lib/queries/stations";
 
@@ -263,14 +264,13 @@ export function AiImportDialog({
                       </Button>
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
-                      <Label htmlFor={`ai-half-points-${i}`} className="text-sm">
-                        Povolit půlbody
+                      <Label htmlFor={`ai-point-step-${i}`} className="text-sm">
+                        Krok bodování
                       </Label>
-                      <Switch
-                        id={`ai-half-points-${i}`}
-                        checked={s.allow_half_points === true}
-                        onCheckedChange={(checked) => updateStation(i, { allow_half_points: checked })}
-                        aria-label="Povolit půlbody"
+                      <PointStepSelect
+                        id={`ai-point-step-${i}`}
+                        value={toPointStep(s.point_step)}
+                        onChange={(step) => updateStation(i, { point_step: step })}
                       />
                     </div>
                     <div className="mt-3 space-y-2">
@@ -284,7 +284,7 @@ export function AiImportDialog({
                           <Input
                             type="number"
                             min={0}
-                            step={s.allow_half_points ? 0.5 : 1}
+                            step={toPointStep(s.point_step)}
                             value={c.max_points}
                             onChange={(e) => updateCriterion(i, ci, { max_points: Number(e.target.value) })}
                             aria-label="Max bodů"

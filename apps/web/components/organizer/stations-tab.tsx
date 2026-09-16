@@ -18,7 +18,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { PointStepSelect, pointStepBadgeLabel } from "@/components/organizer/point-step-select";
 import { useRace, useReissueStationTokens } from "@/lib/queries/races";
 import {
   useStations,
@@ -27,7 +27,7 @@ import {
   useDeactivateStation,
   useResetStationPin,
 } from "@/lib/queries/stations";
-import type { RaceState, Station, StationCriterion } from "@/lib/api/types";
+import { toPointStep, type PointStep, type RaceState, type Station, type StationCriterion } from "@/lib/api/types";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AiImportDialog } from "./ai-import-dialog";
 
@@ -148,7 +148,7 @@ export function StationsTab({ raceId }: { raceId: string }) {
                     <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-0.6 text-scout-text-muted">
                       #{s.position}
                       {s.is_active ? <Badge variant="default">Aktivní</Badge> : <Badge variant="muted">Neaktivní</Badge>}
-                      {s.allow_half_points ? <Badge variant="secondary">0,5 b.</Badge> : null}
+                      {pointStepBadgeLabel(s.point_step) ? <Badge variant="secondary">{pointStepBadgeLabel(s.point_step)}</Badge> : null}
                     </div>
                     <div className="mt-1 truncate text-16 font-bold text-scout-text">{s.name}</div>
                     <div className="mt-1 text-12 text-scout-text-muted">
@@ -276,13 +276,13 @@ function StationDialog({
   const createStation = useCreateStation(raceId);
   const updateStation = useUpdateStation(raceId);
   const [name, setName] = useState("");
-  const [allowHalfPoints, setAllowHalfPoints] = useState(false);
+  const [pointStep, setPointStep] = useState<PointStep>(1);
   const [criteria, setCriteria] = useState<StationCriterion[]>([{ name: "", max_points: 10 }]);
 
   useEffect(() => {
     if (open) {
       setName(station?.name ?? "");
-      setAllowHalfPoints(station?.allow_half_points === true);
+      setPointStep(toPointStep(station?.point_step));
       setCriteria(station?.criteria?.length ? station.criteria : [{ name: "", max_points: 10 }]);
     }
   }, [open, station]);
@@ -308,7 +308,7 @@ function StationDialog({
       const payload = {
         name,
         position: station ? station.position : nextPosition,
-        allow_half_points: allowHalfPoints,
+        point_step: pointStep,
         criteria: cleaned,
       };
       if (station) await updateStation.mutateAsync({ id: station.id, data: payload });
@@ -342,15 +342,10 @@ function StationDialog({
 
             <div className="flex items-center justify-between gap-4 rounded-lg border border-scout-border p-3">
               <div className="space-y-0.5">
-                <Label htmlFor="allow-half-points">Povolit půlbody</Label>
-                <p className="text-12 text-scout-text-muted">Rozhodčí může zadávat body po 0,5.</p>
+                <Label htmlFor="point-step">Krok bodování</Label>
+                <p className="text-12 text-scout-text-muted">Po jakých dílech může rozhodčí zadávat body.</p>
               </div>
-              <Switch
-                id="allow-half-points"
-                checked={allowHalfPoints}
-                onCheckedChange={setAllowHalfPoints}
-                aria-label="Povolit půlbody"
-              />
+              <PointStepSelect id="point-step" value={pointStep} onChange={setPointStep} />
             </div>
 
             <div className="space-y-2">
@@ -367,7 +362,7 @@ function StationDialog({
                     <Input
                       type="number"
                       min={0}
-                      step={allowHalfPoints ? 0.5 : 1}
+                      step={pointStep}
                       value={c.max_points}
                       onChange={(e) => updateCriterion(i, { max_points: Number(e.target.value) })}
                       aria-label="Max bodů"

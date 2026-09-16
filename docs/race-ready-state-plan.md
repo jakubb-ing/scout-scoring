@@ -110,7 +110,7 @@ Pokus o změnu zamčeného pole v `ready` → `{:error, :field_locked}` (409),
 ne tiché ignorování.
 
 `update_station` v `ready` propouští vše: `name`, `position`, `criteria`
-(včetně `max_points`), `allow_half_points`. QR nese jen `id` + `pin`,
+(včetně `max_points`), `point_step`. QR nese jen `id` + `pin`,
 takže tisk zůstává platný.
 
 ### Stažení hlídky

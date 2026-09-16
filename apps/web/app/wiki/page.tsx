@@ -148,7 +148,7 @@ const SECTIONS: Section[] = [
           {
             name: "Stanoviště",
             body:
-              "Definice stanovišť: název, pořadí, kritéria bodování s maximem bodů a přepínač půlbodů. Kritéria se rozhodčímu zobrazí jako formulář. Stanoviště se dá deaktivovat, znovu vydat PIN a vytisknout „Login Cards“ — karty s QR kódem, které se rozdají rozhodčím.",
+              "Definice stanovišť: název, pořadí, kritéria bodování s maximem bodů a krok bodování (celé body, půlbody nebo čtvrtbody). Kritéria se rozhodčímu zobrazí jako formulář. Stanoviště se dá deaktivovat, znovu vydat PIN a vytisknout „Login Cards“ — karty s QR kódem, které se rozdají rozhodčím.",
           },
           {
             name: "Opravy",
@@ -174,6 +174,22 @@ const SECTIONS: Section[] = [
           ["Veřejné výsledky", "Odkaz s přístupovým kódem (např. JARO2026). Kód lze kdykoli přegenerovat — starý odkaz tím přestane platit."],
           ["Zpětná vazba", "Zapnutí funkce, počet polí „Co se povedlo“ a „Prostor pro zlepšení“ (0–10) a přepínač, zda se hodnocení ukáže i ve veřejných výsledcích (výchozí: ne)."],
         ],
+      },
+      {
+        kind: "table",
+        title: "Krok bodování na stanovišti",
+        head: ["Krok", "Kdy se hodí"],
+        rows: [
+          ["1 bod", "Výchozí volba. Rozhodčí zadává jen celá čísla."],
+          ["0,5 bodu", "Když se běžně uděluje půlbod za úkol splněný jen zčásti."],
+          ["0,25 bodu", "Nejjemnější hodnocení, typicky u kritérií s nízkým maximem."],
+        ],
+      },
+      {
+        kind: "note",
+        tone: "warn",
+        body:
+          "Krok se nastavuje u každého stanoviště zvlášť a jde změnit i za běhu závodu. Už zapsané body se tím ale nepřepočítají: hodnocení se 2,5 body zůstane, jak bylo, a po přepnutí stanoviště na celé body ho formulář při další úpravě odmítne, dokud ho rozhodčí nesrovná na nový krok.",
       },
       {
         kind: "list",
@@ -209,7 +225,7 @@ const SECTIONS: Section[] = [
           {
             name: "Zápis bodů",
             body:
-              "Formulář s kritérii daného stanoviště. Body se zadávají v celých číslech, nebo po půl bodu, pokud to stanoviště povoluje. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
+              "Formulář s kritérii daného stanoviště. Body se zadávají po kroku nastaveném na stanovišti: celé body, půlbody nebo čtvrtbody. U každého kritéria jsou tlačítka se znaménkem — červená ubírá, zelená přidává. Vedle drobného kroku je u větších kritérií ještě větší skok, aby se vysoké hodnocení nemuselo naklikat po kouscích. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
           },
           {
             name: "Odeslání",

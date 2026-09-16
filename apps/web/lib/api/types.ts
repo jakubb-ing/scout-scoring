@@ -84,12 +84,22 @@ export interface StationCriterion {
   max_points: number;
 }
 
+export const POINT_STEPS = [1, 0.5, 0.25] as const;
+export type PointStep = (typeof POINT_STEPS)[number];
+
+/** Normalizuje hodnotu z API/formuláře na povolený krok; cokoli jiného je 1. */
+export function toPointStep(value: unknown): PointStep {
+  const n = Number(value);
+  return (POINT_STEPS as readonly number[]).includes(n) ? (n as PointStep) : 1;
+}
+
 export interface Station {
   id: string;
   race?: string;
   name: string;
   position: number;
-  allow_half_points?: boolean;
+  /** Krok bodování: 1, 0.5 nebo 0.25. Chybějící hodnota = 1. */
+  point_step?: PointStep;
   criteria: StationCriterion[];
   is_active: boolean;
   pin?: string;
@@ -235,7 +245,7 @@ export interface StationMePayload {
   station: {
     id: string;
     name: string;
-    allow_half_points?: boolean;
+    point_step?: PointStep;
     criteria: StationCriterion[];
     race: string;
   };
@@ -253,7 +263,7 @@ export interface ActivationPayload {
 export interface AiImportStationDraft {
   name: string;
   position: number;
-  allow_half_points?: boolean;
+  point_step?: PointStep;
   criteria: StationCriterion[];
 }
 

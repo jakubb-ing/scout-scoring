@@ -480,7 +480,7 @@ defmodule Api.Races do
   def list_stations_public_full(race_id) do
     SurrealDB.all(
       """
-      SELECT id, name, position, criteria, allow_half_points
+      SELECT id, name, position, criteria, point_step
       FROM station
       WHERE race = $race
       ORDER BY position, name;
@@ -731,6 +731,36 @@ defmodule Api.Races do
     end
   end
 
+  @point_steps [1.0, 0.5, 0.25]
+
+  @doc """
+  Krok, po kterém se na stanovišti zapisují body. Povolené hodnoty jsou
+  1, 0.5 a 0.25; cokoli jiného (včetně chybějící hodnoty) se bere jako 1.
+  Přijímá číslo i řetězec, protože hodnota chodí z JSON i z DB.
+  """
+  @spec normalize_point_step(term()) :: float()
+  def normalize_point_step(value) do
+    parsed =
+      case value do
+        v when is_float(v) ->
+          v
+
+        v when is_integer(v) ->
+          v * 1.0
+
+        v when is_binary(v) ->
+          case Float.parse(v) do
+            {f, ""} -> f
+            _ -> nil
+          end
+
+        _ ->
+          nil
+      end
+
+    if parsed in @point_steps, do: parsed, else: 1.0
+  end
+
   def create_station(race_id, organizer_id, attrs) do
     with {:ok, _} <- ensure_race_draft_edit(race_id, organizer_id) do
       sql = """
@@ -738,7 +768,7 @@ defmodule Api.Races do
         race = $race,
         name = $name,
         position = $position,
-        allow_half_points = $allow_half_points,
+        point_step = $point_step,
         criteria = $criteria;
       """
 
@@ -746,7 +776,7 @@ defmodule Api.Races do
         race: race_id,
         name: attrs["name"],
         position: attrs["position"] || 0,
-        allow_half_points: attrs["allow_half_points"] == true,
+        point_step: normalize_point_step(attrs["point_step"]),
         criteria: attrs["criteria"] || []
       })
     end
@@ -798,7 +828,7 @@ defmodule Api.Races do
     UPDATE $id SET
       name = $name,
       position = $position,
-      allow_half_points = $allow_half_points,
+      point_step = $point_step,
       criteria = $criteria
     """
 
@@ -806,7 +836,7 @@ defmodule Api.Races do
       id: id,
       name: attrs["name"],
       position: attrs["position"] || 0,
-      allow_half_points: attrs["allow_half_points"] == true,
+      point_step: normalize_point_step(attrs["point_step"]),
       criteria: attrs["criteria"] || []
     })
   end
@@ -817,7 +847,7 @@ defmodule Api.Races do
          {:ok, _race} <- ensure_race_edit(station["race"], organizer_id) do
       case station["is_active"] do
         true ->
-          case deactivate_station_record(id, station["allow_half_points"] == true) do
+          case deactivate_station_record(id, normalize_point_step(station["point_step"])) do
             {:ok, station} when is_map(station) ->
               {:ok, clear_station_access_fields(station)}
 
@@ -840,14 +870,14 @@ defmodule Api.Races do
   end
 
   defp activate_station_record(id, station) do
-    allow_half_points = station["allow_half_points"] == true
+    point_step = normalize_point_step(station["point_step"])
     pin = station["pin"] || StationToken.generate_pin()
     nonce = station["access_token_hash"] || StationToken.generate_nonce()
 
     sql = """
     UPDATE ONLY type::record($table, $record_id) SET
       is_active = true,
-      allow_half_points = $allow_half_points,
+      point_step = $point_step,
       pin = $pin,
       access_token_hash = $nonce;
     """
@@ -857,7 +887,7 @@ defmodule Api.Races do
         SurrealDB.one(
           sql,
           vars
-          |> Map.put(:allow_half_points, allow_half_points)
+          |> Map.put(:point_step, point_step)
           |> Map.put(:pin, pin)
           |> Map.put(:nonce, nonce)
         )
@@ -868,29 +898,29 @@ defmodule Api.Races do
         {:ok, station}
 
       {:ok, nil} ->
-        fallback_activate_station_record(id, allow_half_points, pin, nonce)
+        fallback_activate_station_record(id, point_step, pin, nonce)
 
       {:error, reason} ->
         Logger.warning("Station #{id} typed activate failed: #{inspect(reason)}")
-        fallback_activate_station_record(id, allow_half_points, pin, nonce)
+        fallback_activate_station_record(id, point_step, pin, nonce)
 
       _ ->
-        fallback_activate_station_record(id, allow_half_points, pin, nonce)
+        fallback_activate_station_record(id, point_step, pin, nonce)
     end
   end
 
-  defp fallback_activate_station_record(id, allow_half_points, pin, nonce) do
+  defp fallback_activate_station_record(id, point_step, pin, nonce) do
     sql = """
     UPDATE $id SET
       is_active = true,
-      allow_half_points = $allow_half_points,
+      point_step = $point_step,
       pin = $pin,
       access_token_hash = $nonce;
     """
 
     case SurrealDB.one(sql, %{
            id: id,
-           allow_half_points: allow_half_points,
+           point_step: point_step,
            pin: pin,
            nonce: nonce
          }) do
@@ -902,16 +932,16 @@ defmodule Api.Races do
     end
   end
 
-  defp deactivate_station_record(id, allow_half_points) do
+  defp deactivate_station_record(id, point_step) do
     typed_update =
       with {:ok, vars} <- station_record_vars(id) do
         SurrealDB.one(
           """
           UPDATE ONLY type::record($table, $record_id) SET
             is_active = false,
-            allow_half_points = $allow_half_points;
+            point_step = $point_step;
           """,
-          Map.put(vars, :allow_half_points, allow_half_points)
+          Map.put(vars, :point_step, point_step)
         )
       end
 
@@ -920,21 +950,21 @@ defmodule Api.Races do
         {:ok, station}
 
       {:ok, nil} ->
-        fallback_deactivate_station_record(id, allow_half_points)
+        fallback_deactivate_station_record(id, point_step)
 
       {:error, reason} ->
         Logger.warning("Station #{id} typed deactivate failed: #{inspect(reason)}")
-        fallback_deactivate_station_record(id, allow_half_points)
+        fallback_deactivate_station_record(id, point_step)
 
       _ ->
-        fallback_deactivate_station_record(id, allow_half_points)
+        fallback_deactivate_station_record(id, point_step)
     end
   end
 
-  defp fallback_deactivate_station_record(id, allow_half_points) do
+  defp fallback_deactivate_station_record(id, point_step) do
     SurrealDB.one(
-      "UPDATE $id SET is_active = false, allow_half_points = $allow_half_points;",
-      %{id: id, allow_half_points: allow_half_points}
+      "UPDATE $id SET is_active = false, point_step = $point_step;",
+      %{id: id, point_step: point_step}
     )
   end
 
