@@ -11,14 +11,15 @@ import type { StationCriterion } from "@/lib/api/types";
 export function CriteriaInputs({
   criteria,
   values,
-  allowHalfPoints,
+  pointStep,
   errors,
   onChange,
 }: {
   criteria: StationCriterion[];
   /** Hodnoty podle criterionFieldKey(criterion, index). */
   values: Record<string, string>;
-  allowHalfPoints: boolean;
+  /** Krok bodování stanoviště (1, 0.5, 0.25). */
+  pointStep: number;
   errors?: Record<string, string | undefined>;
   onChange: (fieldKey: string, value: number) => void;
 }) {
@@ -45,7 +46,7 @@ export function CriteriaInputs({
             <NumberStepperInput
               id={`crit-${fieldKey}`}
               max={max}
-              halfStep={allowHalfPoints}
+              step={pointStep}
               value={current}
               onChange={(event) => onChange(fieldKey, Number(event.target.value))}
               aria-label={criterion.name}

@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fastStepFor } from "@/lib/scoring/point-step";
 import { cn } from "@/lib/utils";
 
 type NumericInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "max" | "min" | "step" | "type">;
@@ -16,26 +16,23 @@ export type NumberStepperInputProps = NumericInputProps & {
   max: number;
 
   /**
-   * true: krok 0.5, false: krok 1.
+   * Krok jednoho kliknutí a validace inputu (1, 0.5, 0.25). Default 1.
    */
-  halfStep?: boolean;
+  step?: number;
 };
 
 const min = 0;
 
 const NumberStepperInput = React.forwardRef<HTMLInputElement, NumberStepperInputProps>(
   (
-    { className, disabled, halfStep = false, max, onBlur, onChange, readOnly, style, value, defaultValue, ...props },
+    { className, disabled, step = 1, max, onBlur, onChange, readOnly, style, value, defaultValue, ...props },
     ref
   ) => {
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [uncontrolledValue, setUncontrolledValue] = React.useState(() => String(defaultValue ?? min));
     const isControlled = value !== undefined;
     const inputValue = isControlled ? value : uncontrolledValue;
-    const step = halfStep ? 0.5 : 1;
-    const fastStepRaw = Math.floor(0.4 * max);
-    const showFastStep = fastStepRaw > 1;
-    const fastStep = showFastStep ? fastStepRaw : null;
+    const fastStep = fastStepFor(max, step);
     const currentValue = clamp(toNumber(inputValue), min, max);
     const progress = max > min ? ((currentValue - min) / (max - min)) * 100 : 0;
     const controlsDisabled = disabled || readOnly;
@@ -94,7 +91,7 @@ const NumberStepperInput = React.forwardRef<HTMLInputElement, NumberStepperInput
         <Input
           ref={inputRef}
           type="number"
-          inputMode={halfStep ? "decimal" : "numeric"}
+          inputMode={step < 1 ? "decimal" : "numeric"}
           min={min}
           max={max}
           step={step}
@@ -131,6 +128,16 @@ const NumberStepperInput = React.forwardRef<HTMLInputElement, NumberStepperInput
 );
 NumberStepperInput.displayName = "NumberStepperInput";
 
+/**
+ * Tlačítko kroku. Ikona plus/minus tu původně byla, ale i s mezerou
+ * ujídala 24 px, takže se vedle ní popisek „0,25“ tísnil. Znaménko je
+ * proto součástí textu: zabere jeden znak a na rozdíl od pouhé barvy
+ * ho pozná i ten, kdo červenou od zelené nerozliší.
+ *
+ * Šířka je pevná, aby řada nebyla roztřepená podle toho, jak dlouhé
+ * číslo zrovna vyšlo. Vejde se do ní i nejširší reálný případ, pět
+ * znaků jako „−18,5“.
+ */
 function StepButton({
   amount,
   disabled,
@@ -140,7 +147,8 @@ function StepButton({
   disabled?: boolean;
   onClick: () => void;
 }) {
-  const Icon = amount < 0 ? Minus : Plus;
+  const isSubtract = amount < 0;
+  const label = formatStepLabel(Math.abs(amount));
 
   return (
     <Button
@@ -149,11 +157,18 @@ function StepButton({
       size="sm"
       disabled={disabled}
       onClick={onClick}
-      aria-label={amount < 0 ? `Odebrat ${formatNumber(Math.abs(amount))}` : `Přidat ${formatNumber(amount)}`}
-      className="h-10 min-w-12 px-2 tabular-nums"
+      aria-label={isSubtract ? `Odebrat ${label}` : `Přidat ${label}`}
+      className={cn(
+        "h-10 w-13 shrink-0 gap-0.5 px-1 text-13 tabular-nums",
+        isSubtract
+          ? "border-scout-red-border bg-scout-red-soft text-scout-red-deep hover:bg-scout-red/15 hover:text-scout-red-deep"
+          : "border-scout-green-border bg-scout-green-soft text-scout-green-deep hover:bg-scout-green/15 hover:text-scout-green-deep"
+      )}
     >
-      <Icon className="h-3.5 w-3.5" />
-      {formatNumber(Math.abs(amount))}
+      {/* U+2212 je typografické minus, ne spojovník: má šířku číslice,
+          takže se znaménka na obou stranách opticky srovnají. */}
+      <span aria-hidden="true">{isSubtract ? "\u2212" : "+"}</span>
+      {label}
     </Button>
   );
 }
@@ -167,8 +182,15 @@ function clamp(value: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, value));
 }
 
+// Pozor, dvě formátování se záměrně liší. `formatNumber` plní `value`
+// číselného inputu, kam patří tečka — s čárkou by input hodnotu zahodil.
+// `formatStepLabel` je jen text na tlačítku, a ten je česky.
 function formatNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : String(value);
+  return String(value);
+}
+
+function formatStepLabel(value: number) {
+  return String(value).replace(".", ",");
 }
 
 export { NumberStepperInput };

@@ -63,8 +63,16 @@ const config: Config = {
             DEFAULT: "#008836",
             soft: "#EBF7EE",
             border: "#B8E2C4",
+            // Text na zeleném `soft` podkladu; DEFAULT na něm dává jen
+            // 4,15:1, tenhle 5,6:1, takže projde AA i pro drobné písmo.
+            deep: "#00702C",
           },
-          red: "#EA614A",
+          red: {
+            DEFAULT: "#EA614A",
+            soft: "#FDEFEC",
+            border: "#F6C7BD",
+            deep: "#C2381F",
+          },
           bg: {
             app: "#EDEAE2",
             white: "#FFFFFF",

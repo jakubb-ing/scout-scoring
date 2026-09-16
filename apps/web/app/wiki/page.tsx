@@ -148,7 +148,7 @@ const SECTIONS: Section[] = [
           {
             name: "Stanoviště",
             body:
-              "Definice stanovišť: název, pořadí, kritéria bodování s maximem bodů a přepínač půlbodů. Kritéria se rozhodčímu zobrazí jako formulář. Stanoviště se dá deaktivovat, znovu vydat PIN a vytisknout „Login Cards“ — karty s QR kódem, které se rozdají rozhodčím.",
+              "Definice stanovišť: název, pořadí, kritéria bodování s maximem bodů a krok bodování (celé body, půlbody nebo čtvrtbody). Kritéria se rozhodčímu zobrazí jako formulář. Stanoviště se dá deaktivovat, znovu vydat PIN a vytisknout „Login Cards“ — karty s QR kódem, které se rozdají rozhodčím.",
           },
           {
             name: "Opravy",
@@ -209,7 +209,7 @@ const SECTIONS: Section[] = [
           {
             name: "Zápis bodů",
             body:
-              "Formulář s kritérii daného stanoviště. Body se zadávají v celých číslech, nebo po půl bodu, pokud to stanoviště povoluje. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
+              "Formulář s kritérii daného stanoviště. Body se zadávají po kroku nastaveném na stanovišti: celé body, půlbody nebo čtvrtbody. Podle nastavení závodu se doplní čas příchodu a odchodu ve formátu HH:MM. Aplikace hlídá maximum bodů i formát času.",
           },
           {
             name: "Odeslání",

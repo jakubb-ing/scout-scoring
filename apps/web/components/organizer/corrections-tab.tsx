@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CriteriaInputs, clamp, criterionFieldKey } from "@/components/station/criteria-inputs";
 import { AuditLogPanel } from "@/components/organizer/audit-log-panel";
 import { useResults, useCorrectScoreEntry } from "@/lib/queries/dashboard";
-import type { Patrol, ScoreEntry, Station } from "@/lib/api/types";
+import { toPointStep, type Patrol, type ScoreEntry, type Station } from "@/lib/api/types";
 
 /**
  * Dodatečné opravy bodů — jediná cesta, jak upravit hodnocení po uzavření
@@ -159,7 +159,7 @@ function CorrectionDialog({
     () => (station.criteria ?? []).map((c, index) => ({ ...c, id: index })),
     [station.criteria]
   );
-  const allowHalfPoints = station.allow_half_points === true;
+  const pointStep = toPointStep(station.point_step);
 
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seeded: Record<string, string> = {};
@@ -213,7 +213,7 @@ function CorrectionDialog({
         <CriteriaInputs
           criteria={criteria}
           values={values}
-          allowHalfPoints={allowHalfPoints}
+          pointStep={pointStep}
           onChange={(fieldKey, value) =>
             setValues((prev) => ({ ...prev, [fieldKey]: String(value) }))
           }

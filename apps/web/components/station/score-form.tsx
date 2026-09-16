@@ -22,7 +22,7 @@ interface Props {
   stationName?: string;
   patrol: Patrol;
   criteria: StationCriterion[];
-  allowHalfPoints?: boolean;
+  pointStep?: number;
   existing: ScoreEntry | null;
   onSaved: () => void;
   onCancel: () => void;
@@ -40,7 +40,7 @@ const timeFieldSchema = z
   .regex(/^\d{2}:\d{2}$/, "Zadej čas ve formátu HH:MM.")
   .or(z.literal(""));
 
-function createScoreFormSchema(criteria: StationCriterion[], allowHalfPoints: boolean) {
+function createScoreFormSchema(criteria: StationCriterion[], pointStep: number) {
   return z
     .object({
       points: z.record(z.string()),
@@ -75,11 +75,11 @@ function createScoreFormSchema(criteria: StationCriterion[], allowHalfPoints: bo
           continue;
         }
 
-        if (!hasValidIncrement(parsed, allowHalfPoints)) {
+        if (!hasValidIncrement(parsed, pointStep)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["points", fieldKey],
-            message: allowHalfPoints ? "Zadej celé číslo nebo půl bodu." : "Zadej celé body.",
+            message: pointStep < 1 ? `Zadej body po ${formatStep(pointStep)}.` : "Zadej celé body.",
           });
         }
       }
@@ -91,13 +91,13 @@ export function ScoreForm({
   stationName,
   patrol,
   criteria,
-  allowHalfPoints = false,
+  pointStep = 1,
   existing,
   onSaved,
   onCancel,
 }: Props) {
   const upsert = useUpsertScoreEntry();
-  const schema = useMemo(() => createScoreFormSchema(criteria, allowHalfPoints), [allowHalfPoints, criteria]);
+  const schema = useMemo(() => createScoreFormSchema(criteria, pointStep), [pointStep, criteria]);
   const {
     formState,
     handleSubmit,
@@ -153,7 +153,7 @@ export function ScoreForm({
     try {
       const scoresPayload = criteria.map((c, index) => ({
         criterion: c.name,
-        points: clamp(normalizePointsValue(values.points[criterionFieldKey(c, index)], allowHalfPoints), 0, c.max_points),
+        points: clamp(normalizePointsValue(values.points[criterionFieldKey(c, index)], pointStep), 0, c.max_points),
       }));
 
       // Zápis jde do outboxu — resolvne hned, síť řeší flusher na pozadí.
@@ -209,7 +209,7 @@ export function ScoreForm({
         <CriteriaInputs
           criteria={criteria}
           values={watchedPoints ?? {}}
-          allowHalfPoints={allowHalfPoints}
+          pointStep={pointStep}
           errors={Object.fromEntries(
             criteria.map((c, index) => {
               const key = criterionFieldKey(c, index);
@@ -307,17 +307,26 @@ function seedPoints(criteria: StationCriterion[], existing: ScoreEntry | null): 
   return result;
 }
 
-function hasValidIncrement(value: number, allowHalfPoints: boolean) {
-  const multiplier = allowHalfPoints ? 2 : 1;
-  return Number.isInteger(value * multiplier);
+// Násobek 1/step (1, 2, 4) místo dělení stepem — u 0.25 a 0.5 je to přesné
+// v binární aritmetice, takže 0.75 * 4 === 3 bez zaokrouhlovacích chyb.
+function stepMultiplier(pointStep: number) {
+  return pointStep > 0 ? Math.round(1 / pointStep) : 1;
 }
 
-function normalizePointsValue(value: string | undefined, allowHalfPoints: boolean) {
+function hasValidIncrement(value: number, pointStep: number) {
+  return Number.isInteger(value * stepMultiplier(pointStep));
+}
+
+function normalizePointsValue(value: string | undefined, pointStep: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
 
-  const multiplier = allowHalfPoints ? 2 : 1;
+  const multiplier = stepMultiplier(pointStep);
   return Math.round(parsed * multiplier) / multiplier;
+}
+
+function formatStep(pointStep: number) {
+  return String(pointStep).replace(".", ",");
 }
 
 function formatCategory(category?: string | null) {
