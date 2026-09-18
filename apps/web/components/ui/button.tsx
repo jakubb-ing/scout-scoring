@@ -9,7 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "border border-transparent bg-scout-blue !text-white hover:bg-scout-blue-mid",
+        // Bez `!` u text-white: `!important` přebije i barvu, kterou volající
+        // pošle v `className`, takže `bg-white text-scout-blue` skončilo jako
+        // bílý text na bílém pozadí. tailwind-merge si s konfliktem poradí
+        // sám — když volající barvu nepošle, zůstane bílá.
+        default: "border border-transparent bg-scout-blue text-white hover:bg-scout-blue-mid",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border-1.5 border-scout-border bg-white text-scout-text-secondary hover:bg-scout-bg-subtle hover:text-scout-text",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
