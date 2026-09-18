@@ -131,40 +131,40 @@ Pokud `flyctl ssh console -C` nevrací výstup, použij
 > ověřena. Databáze je **prázdná** a API pořád jezdí na Surreal Cloud.
 > Odsud dál se sahá na živá data — dělej to mimo závod.
 
-Během tohohle kroku se do aplikace nesmí zapisovat. Naplánuj ho mimo závod.
+Celý přenos dělá `infra/db/migrate-from-cloud.sh`:
 
 ```sh
-# Proměnné pro starý Cloud — hodnoty vezmi ze správce hesel.
-export OLD_URL="https://jacob-instance-....aws-euw1.surreal.cloud"
-export OLD_USER=root OLD_PASS="..."
-
-# Export
-surreal export --endpoint "$OLD_URL" --username "$OLD_USER" --password "$OLD_PASS" \
-  --namespace scout --database scoring ./scout-export.surql
-
-wc -l ./scout-export.surql       # nesmí být prázdné
-grep -c "^INSERT\|^CREATE" ./scout-export.surql
-
-# Import do nové instance přes proxy na privátní síť
-flyctl proxy 8001:8000 -a db-scout-scoring &
-
-surreal import --endpoint http://127.0.0.1:8001 \
-  --username root --password "$NEW_PASS" \
-  --namespace scout --database scoring ./scout-export.surql
+OLD_URL="https://jacob-instance-06e7b91urprs5fprgc6vipcdt4.aws-euw1.surreal.cloud" \
+OLD_PASS='heslo ke Cloudu' \
+NEW_PASS='heslo k nové instanci' \
+  ./infra/db/migrate-from-cloud.sh
 ```
 
-Migrace schématu se pouští sama při startu API (`release_command` v
-`apps/api/fly.toml`), ale na prázdné databázi je pořádek si ji ověřit:
+Obě hesla jsou ve správci hesel — `flyctl secrets list` ukazuje jen otisky.
 
-```sh
-surreal sql --endpoint http://127.0.0.1:8001 --username root --password "$NEW_PASS" \
-  --namespace scout --database scoring --pretty <<'SQL'
-INFO FOR DB;
-SELECT count() FROM race GROUP ALL;
-SQL
-```
+Skript **nepřepíná aplikaci**. Když doběhne, data jsou na obou místech a API
+pořád čte ze Cloudu. Přepnutí je vědomý druhý krok (sekce 5).
 
-Počty porovnej se starou instancí **předtím, než přepneš aplikaci**.
+### Proč po HTTP a ne přes `surreal` CLI
+
+Skript jede po endpointech `/export` a `/import`. Export starším klientem
+z novějšího serveru je zdroj tichých ztrát, a lokální CLI bývá pozadu —
+tenhle způsob ten problém obchází a nevyžaduje od tebe žádnou instalaci
+navíc (jen `flyctl`, `curl` a `jq`).
+
+### Co skript hlídá
+
+- **Prázdný export** — zastaví se, než cokoliv naimportuje. Uříznutý dump
+  vypadá jako úspěch, dokud ho nepotřebuješ.
+- **Neprázdný cíl** — odmítne importovat do databáze, která už data má.
+  Import by je smíchal, ne nahradil.
+- **Počty záznamů po tabulkách** na obou stranách, vypsané vedle sebe. Tohle
+  je jediný skutečný důkaz, že se přeneslo všechno; „import doběhl bez
+  chyby" to neznamená. Když nesedí, skript skončí nenulově a řekne ti, ať
+  aplikaci nepřepínáš.
+
+Mechanika skriptu (export → smazání → import → porovnání počtů) je ověřená
+proti nasazené instanci na syntetických datech, včetně úklidu.
 
 ## 5. Přepnutí aplikace
 
