@@ -100,13 +100,36 @@ flyctl ssh console -a api-scout-scoring -C \
 ```
 
 Privátní síť Fly (6PN) jezdí **výhradně po IPv6**, `*.internal` má jen AAAA
-záznam. Mint (pod `Req`/`Finch`) má `inet6` ve výchozím stavu vypnuté a na
-takovou adresu by se vůbec nepřipojil. `Api.SurrealDB` proto posílá
-`connect_options: [transport_opts: [inet6: true]]` — zkusí IPv6 a při
-neúspěchu spadne zpět na IPv4, takže totéž nastavení funguje i proti
-localhostu ve vývoji.
+záznam. Musí sedět obě strany a každá se láme jinak:
+
+- **Server**: `--bind [::]:8000`, ne `0.0.0.0:8000`. Socket na `0.0.0.0`
+  přijímá jen IPv4. Zákeřné na tom je, že databáze naběhne a **health check
+  Fly projde** (ten chodí zevnitř mašiny po IPv4), takže `flyctl status`
+  hlásí „passing", zatímco aplikace se nepřipojí. Přesně tahle past při
+  rozjezdu sklapla.
+- **Klient**: Mint (pod `Req`/`Finch`) má `inet6` ve výchozím stavu vypnuté.
+  `Api.SurrealDB` proto posílá
+  `connect_options: [transport_opts: [inet6: true]]` — zkusí IPv6 a při
+  neúspěchu spadne zpět na IPv4, takže totéž nastavení funguje i proti
+  localhostu ve vývoji.
+
+Ověřeno z produkční API mašiny proti nasazené databázi:
+
+```
+S inet6   : HTTP 200
+Bez inet6 : CHYBA Req.TransportError
+```
+
+Pokud `flyctl ssh console -C` nevrací výstup, použij
+`flyctl machine exec <id> -a api-scout-scoring "..."`.
 
 ## 4. Přenos dat
+
+> **Stav k 18. 9. 2026:** kroky 1–3 jsou hotové. Aplikace `db-scout-scoring`
+> běží ve `fra` na volume `scout_db_data` (3 GB, šifrované, denní
+> snapshoty), verze 3.2.4, health check prochází, dosažitelnost z API
+> ověřena. Databáze je **prázdná** a API pořád jezdí na Surreal Cloud.
+> Odsud dál se sahá na živá data — dělej to mimo závod.
 
 Během tohohle kroku se do aplikace nesmí zapisovat. Naplánuj ho mimo závod.
 

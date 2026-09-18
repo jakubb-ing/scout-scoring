@@ -19,7 +19,13 @@ kill_timeout = 30
   # Přihlašovací údaje bere surreal z env proměnných SURREAL_USER a
   # SURREAL_PASS — ve `fly secrets`, ne tady. Fly v tomhle řádku env
   # proměnné neexpanduje, takže je do něj psát nejde.
-  app = 'start --bind 0.0.0.0:8000 --log info rocksdb:/data/scoring.db'
+  #
+  # Bind na `[::]`, ne na `0.0.0.0`. Privátní síť Fly je výhradně IPv6 a
+  # socket na 0.0.0.0 přijímá jen IPv4 — databáze pak sice naběhne, health
+  # check Fly projde (ten chodí po IPv4 zevnitř mašiny), ale aplikace se na
+  # ni přes `db-scout-scoring.internal` nepřipojí. `[::]` je na Linuxu
+  # dual-stack, takže obslouží obojí.
+  app = 'start --bind [::]:8000 --log info rocksdb:/data/scoring.db'
 
 # Žádná [http_service] ani [[services]] sekce — a to je záměr. Bez nich
 # aplikace nedostane veřejnou IP a databáze je dosažitelná jen po privátní
