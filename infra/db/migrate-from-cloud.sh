@@ -19,6 +19,7 @@
 # Během běhu se do aplikace nesmí zapisovat. Pusť to mimo závod.
 
 set -euo pipefail
+trap 'rc=$?; [[ $rc -ne 0 ]] && echo "SKRIPT SPADL na řádku $LINENO (návratový kód $rc)." >&2' ERR
 
 API_APP="${API_APP:-api-scout-scoring}"
 NEW_APP="${SURREAL_APP:-db-scout-scoring}"
@@ -66,24 +67,32 @@ DUMP="$OUT_DIR/cloud-${OLD_DB}-${STAMP}.surql"
 # Spočítá záznamy v každé tabulce. Tenhle výstup je jediný způsob, jak
 # poznat, že se přeneslo všechno — „import doběhl bez chyby" to neznamená.
 counts() {
-  local url="$1" user="$2" pass="$3" NS="$4" DB="$5"
-  local tables
-  tables=$(curl -fsS --max-time 30 -X POST "$url/rpc" \
+  local url="$1" user="$2" pass="$3" ns="$4" db="$5"
+  local info tables res q t
+
+  info=$(curl -sS --max-time 30 -X POST "$url/rpc" \
     -H 'Content-Type: application/json' -H 'Accept: application/json' \
-    -H "Surreal-NS: $NS" -H "Surreal-DB: $DB" -u "$user:$pass" \
-    -d '{"id":1,"method":"query","params":["INFO FOR DB"]}' \
-    | jq -r '.result[0].result.tables // {} | keys[]' 2>/dev/null) || return 1
+    -H "Surreal-NS: $ns" -H "Surreal-DB: $db" -u "$user:$pass" \
+    -d '{"id":1,"method":"query","params":["INFO FOR DB"]}') || return 1
+
+  # Na dosud nezaložený jmenný prostor vrátí SurrealDB HTTP 200 a chybu až
+  # v těle odpovědi. Pro nás to není chyba — je to prázdná databáze, tedy
+  # nula záznamů. Dřív tady skript kvůli jq spadl, a protože měl volání
+  # přesměrované do /dev/null, ukončil se bez jediného slova.
+  tables=$(printf '%s' "$info" \
+    | jq -r 'try (.result[0].result.tables | keys[]) catch empty' 2>/dev/null) || true
   [[ -z "$tables" ]] && return 0
-  local q=""
+
+  q=""
   for t in $tables; do q+="SELECT count() FROM ${t} GROUP ALL;"; done
-  local res
-  res=$(curl -fsS --max-time 60 -X POST "$url/rpc" \
+  res=$(curl -sS --max-time 120 -X POST "$url/rpc" \
     -H 'Content-Type: application/json' -H 'Accept: application/json' \
-    -H "Surreal-NS: $NS" -H "Surreal-DB: $DB" -u "$user:$pass" \
-    -d "$(jq -nc --arg q "$q" '{id:1,method:"query",params:[$q]}')")
+    -H "Surreal-NS: $ns" -H "Surreal-DB: $db" -u "$user:$pass" \
+    -d "$(jq -nc --arg q "$q" '{id:1,method:"query",params:[$q]}')") || return 1
+
   paste -d' ' \
     <(printf '%s\n' $tables) \
-    <(echo "$res" | jq -r '.result[] | (.result[0].count // 0)')
+    <(printf '%s' "$res" | jq -r '.result[] | (try (.result[0].count) catch 0) // 0')
 }
 
 echo "==> 1/5  Export ze Surreal Cloud"
@@ -108,7 +117,7 @@ nc -z 127.0.0.1 "$PORT" 2>/dev/null || { echo "Tunel nenaběhl." >&2; exit 1; }
 sleep 2
 
 # Import do neprázdné databáze by data míchal, ne nahrazoval.
-EXISTING="$(counts "$NEW_URL" "$NEW_USER" "$NEW_PASS" "$NEW_NS" "$NEW_DB" 2>/dev/null | awk '{s+=$2} END{print s+0}')"
+EXISTING="$(counts "$NEW_URL" "$NEW_USER" "$NEW_PASS" "$NEW_NS" "$NEW_DB" | awk '{s+=$2} END{print s+0}')"
 if [[ "${EXISTING:-0}" -gt 0 ]]; then
   echo "Cílová databáze už obsahuje $EXISTING záznamů. Import by je smíchal" >&2
   echo "s importovanými. Vyprázdni ji, nebo si rozmysli, co chceš." >&2
