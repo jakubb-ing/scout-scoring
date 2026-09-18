@@ -14,6 +14,7 @@ help:
 	@echo "  make web-build      Production build of the web app"
 	@echo "  make test           All tests that do not need a database (api + web)"
 	@echo "  make test-db        API tests against a running SurrealDB (make db-local)"
+	@echo "  make db-tunnel      Tunel na PRODUKCNI databazi na :8001 (ziva data!)"
 	@echo ""
 	@echo "Local run — three terminals:"
 	@echo "  1) make db-local    2) make api-server    3) make web-dev"
@@ -21,6 +22,17 @@ help:
 	@echo ""
 	@echo "Prod: DB runs as a separate surrealdb instance (fly.io), configured via"
 	@echo "SURREAL_URL / SURREAL_NS / SURREAL_DB / SURREAL_USER / SURREAL_PASS env vars."
+
+# Tunel na produkční databázi na Fly. Ta nemá veřejnou IP — je dosažitelná
+# jen po privátní síti Fly, a tohle je most z tvého počítače. Nech běžet
+# v jednom terminálu a připoj se z Surrealistu nebo `surreal sql` na
+# 127.0.0.1:8001 (ns i db se jmenují scout_scoring, uživatel root).
+# Heslo je ve správci hesel.
+#
+# Pozor: tohle sahá na živá data závodů. Není to vývojová databáze.
+db-tunnel:
+	@echo "Tunel na produkcni SurrealDB -> http://127.0.0.1:8001 (Ctrl-C ukonci)"
+	flyctl proxy 8001:8000 -a db-scout-scoring
 
 db-local:
 	@mkdir -p /tmp/scout-surreal
