@@ -1,0 +1,53 @@
+# SurrealDB jako samostatná Fly aplikace ve stejném regionu jako API.
+#
+# Nasazuje se z tohohle adresáře:  flyctl deploy -c infra/db/fly.toml
+# Postup prvního rozjezdu i migrace dat je v docs/surrealdb-on-fly.md.
+
+app = 'db-scout-scoring'
+primary_region = 'fra'
+kill_signal = 'SIGTERM'
+# Databáze musí stihnout dopsat a zavřít RocksDB, než ji Fly zabije.
+kill_timeout = 30
+
+[build]
+  # Verze se drží přesně na tom, co běží na Surreal Cloud (ověřeno přes
+  # GET /version → surrealdb-3.2.4). Export z 3.2.4 do starší 3.1.x by byl
+  # downgrade formátu. Při povyšování verze se nejdřív dělá export.
+  image = 'surrealdb/surrealdb:v3.2.4'
+
+[processes]
+  # Přihlašovací údaje bere surreal z env proměnných SURREAL_USER a
+  # SURREAL_PASS — ve `fly secrets`, ne tady. Fly v tomhle řádku env
+  # proměnné neexpanduje, takže je do něj psát nejde.
+  app = 'start --bind 0.0.0.0:8000 --log info rocksdb:/data/scoring.db'
+
+# Žádná [http_service] ani [[services]] sekce — a to je záměr. Bez nich
+# aplikace nedostane veřejnou IP a databáze je dosažitelná jen po privátní
+# síti Fly (6PN) na adrese db-scout-scoring.internal:8000. Root heslo tak
+# nikdy neleží na veřejném internetu.
+
+[mounts]
+  source = 'scout_db_data'
+  destination = '/data'
+
+[deploy]
+  # Volume umí připojit jen jedna mašina, takže rolling deploy nemá kam
+  # přepnout. `immediate` znamená krátký výpadek při každém deployi DB —
+  # proto se DB nedeployuje během závodu.
+  strategy = 'immediate'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  # 512 MB je pro RocksDB s jeho cache a compaction těsné. 1 GB je levná
+  # pojistka proti OOM při větším importu.
+  memory_mb = 1024
+
+[checks]
+  [checks.health]
+    type = 'http'
+    port = 8000
+    path = '/health'
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '30s'

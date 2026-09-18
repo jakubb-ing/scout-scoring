@@ -13,6 +13,13 @@ defmodule Api.SurrealDB do
 
   @type query_result :: {:ok, list(any())} | {:error, term()}
 
+  # Privátní síť Fly (6PN) jezdí výhradně po IPv6 — `*.internal` má jen
+  # AAAA záznam. Mint má `inet6` ve výchozím stavu vypnuté, takže by se na
+  # takovou adresu vůbec nepřipojil. S `inet6: true` zkusí nejdřív IPv6 a
+  # při neúspěchu spadne zpět na IPv4, takže to funguje i proti localhostu
+  # ve vývoji a proti veřejné adrese Surreal Cloud.
+  @connect_options [transport_opts: [inet6: true]]
+
   def query(sql, vars \\ %{}) when is_binary(sql) and is_map(vars) do
     cfg = config()
 
@@ -34,7 +41,8 @@ defmodule Api.SurrealDB do
         headers: headers,
         auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
         json: body,
-        receive_timeout: 15_000
+        receive_timeout: 15_000,
+        connect_options: @connect_options
       )
     end)
     |> case do
@@ -85,7 +93,8 @@ defmodule Api.SurrealDB do
         headers: headers,
         auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
         body: interpolate(sql, vars),
-        receive_timeout: 30_000
+        receive_timeout: 30_000,
+        connect_options: @connect_options
       )
     end)
     |> case do
@@ -115,7 +124,10 @@ defmodule Api.SurrealDB do
   end
 
   def health do
-    case Req.get(config()[:url] <> "/health", receive_timeout: 2_000) do
+    case Req.get(config()[:url] <> "/health",
+           receive_timeout: 2_000,
+           connect_options: @connect_options
+         ) do
       {:ok, %Req.Response{status: 200}} -> :ok
       other -> {:error, other}
     end
