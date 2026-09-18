@@ -9,6 +9,8 @@ defmodule Api.Application do
 
   @impl true
   def start(_type, _args) do
+    Api.SurrealDB.ConnTelemetry.attach()
+
     maybe_run_migrations()
     maybe_run_seed()
 
@@ -25,7 +27,14 @@ defmodule Api.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Api.Supervisor]
-    Supervisor.start_link(children, opts)
+    result = Supervisor.start_link(children, opts)
+
+    # Značka pro odlišení cold startu: odstup mezi tímhle řádkem a prvním
+    # `timing ...` řádkem je doba, kterou uživatel čekal na nabootování
+    # mašiny, ne na aplikaci ani na databázi.
+    Logger.info("api booted (uptime #{:erlang.statistics(:wall_clock) |> elem(0)}ms)")
+
+    result
   end
 
   defp maybe_run_migrations do

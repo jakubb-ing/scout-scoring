@@ -29,12 +29,15 @@ defmodule Api.SurrealDB do
       {"Surreal-DB", cfg[:database]}
     ]
 
-    case Req.post(cfg[:url] <> "/rpc",
-           headers: headers,
-           auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
-           json: body,
-           receive_timeout: 15_000
-         ) do
+    measure("rpc", sql, fn ->
+      Req.post(cfg[:url] <> "/rpc",
+        headers: headers,
+        auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
+        json: body,
+        receive_timeout: 15_000
+      )
+    end)
+    |> case do
       {:ok, %Req.Response{status: 200, body: %{"result" => results}}} when is_list(results) ->
         collect(results)
 
@@ -77,12 +80,15 @@ defmodule Api.SurrealDB do
       {"Surreal-DB", cfg[:database]}
     ]
 
-    case Req.post(cfg[:url] <> "/sql",
-           headers: headers,
-           auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
-           body: interpolate(sql, vars),
-           receive_timeout: 30_000
-         ) do
+    measure("sql", sql, fn ->
+      Req.post(cfg[:url] <> "/sql",
+        headers: headers,
+        auth: {:basic, "#{cfg[:user]}:#{cfg[:pass]}"},
+        body: interpolate(sql, vars),
+        receive_timeout: 30_000
+      )
+    end)
+    |> case do
       {:ok, %Req.Response{status: 200, body: results}} when is_list(results) ->
         {:ok, results}
 
@@ -142,4 +148,58 @@ defmodule Api.SurrealDB do
   end
 
   defp config, do: Application.fetch_env!(:api, __MODULE__)
+
+  # --- Instrumentace -------------------------------------------------------
+  #
+  # Cíl: rozdělit dobu odpovědi na (a) boot mašiny, (b) čekání na databázi,
+  # (c) naši aplikaci. Tahle část měří (b). `ApiWeb.Plugs.RequestTiming`
+  # posčítá dotazy v rámci jednoho requestu, `Api.SurrealDB.ConnTelemetry`
+  # ukáže, jestli se TCP/TLS spojení recykluje, nebo se navazuje pokaždé
+  # znovu (to by přidávalo 2 RTT na každý dotaz).
+
+  @acc_key :surreal_timing
+
+  defp measure(kind, sql, fun) do
+    started = System.monotonic_time()
+    result = fun.()
+    us = System.convert_time_unit(System.monotonic_time() - started, :native, :microsecond)
+
+    record(us)
+
+    Logger.info(fn ->
+      "surrealdb #{kind} #{div(us, 100) / 10}ms #{outcome(result)} #{summarize(sql)}"
+    end)
+
+    result
+  end
+
+  defp outcome({:ok, %Req.Response{status: status}}), do: "status=#{status}"
+  defp outcome({:error, reason}), do: "transport_error=#{inspect(reason)}"
+  defp outcome(_), do: "unknown"
+
+  # První řádek dotazu, zkrácený — aby se v logu poznalo, o který dotaz jde,
+  # ale neutekly do něj hodnoty ani celé migrační skripty.
+  defp summarize(sql) do
+    sql
+    |> String.split("\n", parts: 2)
+    |> hd()
+    |> String.trim()
+    |> String.slice(0, 120)
+  end
+
+  defp record(us) do
+    {count, total} = Process.get(@acc_key, {0, 0})
+    Process.put(@acc_key, {count + 1, total + us})
+  end
+
+  @doc """
+  Kolik dotazů a kolik mikrosekund v nich strávil *tenhle* proces.
+
+  Phoenix obsluhuje každý HTTP request ve vlastním procesu, takže je to
+  přesně součet za jeden request. Vrací `{počet, mikrosekundy}`.
+  """
+  def timing_snapshot, do: Process.get(@acc_key, {0, 0})
+
+  @doc "Vynuluje počítadlo pro tenhle proces."
+  def reset_timing, do: Process.delete(@acc_key)
 end
