@@ -48,5 +48,6 @@ defmodule ApiWeb.Endpoint do
     allow_headers: ["content-type", "authorization"],
     max_age: 600
 
+  plug ApiWeb.Plugs.RequestTiming
   plug ApiWeb.Router
 end

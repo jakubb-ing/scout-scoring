@@ -1,0 +1,218 @@
+# SurrealDB na Fly.io
+
+Postup přesunu databáze ze Surreal Cloud (Dublin) na vlastní instanci na
+Fly.io ve Frankfurtu, ve stejném regionu jako API.
+
+## Proč
+
+Měření z produkce (instrumentace v `Api.SurrealDB` a
+`ApiWeb.Plugs.RequestTiming`, viz commit „perf: measure where response time
+actually goes"): jeden triviální `SELECT` přes už navázané spojení trvá
+**63–144 ms, medián ~85 ms**, zatímco naše vlastní kód spotřebuje 0,1 ms.
+
+Čistá síťová odezva Frankfurt↔Dublin je ~20 ms. Zbylých ~65 ms se tráví
+uvnitř Surreal Cloud. **Geografie je tedy zhruba čtvrtina problému** —
+hlavní zisk z tohohle přesunu není zkrácení trasy, ale odchod z pomalé
+sdílené instance. Je dobré to vědět dopředu, aby výsledek nezklamal: pokud
+po přesunu klesne medián z 85 ms na jednotky ms, byla za to zodpovědná
+instance, ne vzdálenost.
+
+## Co to stojí
+
+Za tohle rozhodnutí se platí provozem. Managed služba se vyměňuje za jeden
+node, který:
+
+- **nemá HA** — jedna mašina, jedno volume; skutečná HA u SurrealDB znamená
+  TiKV backend, což je úplně jiná liga složitosti,
+- **má výpadek při každém deployi databáze** (volume umí připojit jen jedna
+  mašina, takže `strategy = 'immediate'`) — proto se DB nedeployuje během
+  závodu,
+- **se zálohuje sám** a záloha bez otestovaného obnovení není záloha.
+
+U aplikace, kde ztráta dat znamená ztracené výsledky závodu, je krok
+„otestovat obnovení" povinný, ne volitelný.
+
+## Příprava
+
+Ověřené předpoklady (stav k 18. 9. 2026):
+
+| Věc | Hodnota | Jak ověřeno |
+|---|---|---|
+| Verze na Cloudu | `surrealdb-3.2.4` | `GET /version` |
+| Image pro Fly | `surrealdb/surrealdb:v3.2.4` | existuje na Docker Hubu |
+| Objem dat | hluboko pod 1 GB | kvóta 1 GB zatím nevyčerpaná |
+| Konfigurace v kódu | jen env proměnné | `config/runtime.exs:51-56` |
+
+Poslední řádek je důležitý: **přepnutí databáze nevyžaduje změnu kódu**,
+jen jiné hodnoty `SURREAL_URL` / `SURREAL_NS` / `SURREAL_DB` /
+`SURREAL_USER` / `SURREAL_PASS`.
+
+### Lokální CLI musí sedět s verzí serveru
+
+```sh
+surreal version      # musí hlásit 3.2.x
+```
+
+Pokud hlásí starší (např. 3.0.0), povyš ho dřív, než sáhneš na export:
+
+```sh
+brew upgrade surrealdb/tap/surreal   # nebo: curl -sSf https://install.surrealdb.com | sh
+```
+
+Export starším klientem z novějšího serveru je zdroj tichých ztrát.
+
+## 1. Vytvoření aplikace a volume
+
+```sh
+flyctl apps create db-scout-scoring --org personal
+
+# Volume ve stejném regionu jako API. 3 GB dává prostor datům, exportům
+# i RocksDB compaction, která si při práci alokuje navíc.
+flyctl volumes create scout_db_data --app db-scout-scoring --region fra --size 3
+
+# Root přihlášení. Heslo vygeneruj, nevymýšlej.
+flyctl secrets set --app db-scout-scoring \
+  SURREAL_USER=root \
+  SURREAL_PASS="$(openssl rand -base64 32)"
+```
+
+Heslo si ulož do správce hesel — `flyctl secrets list` ukazuje jen otisky,
+zpátky ho nedostaneš.
+
+## 2. Nasazení
+
+```sh
+flyctl deploy -c infra/db/fly.toml
+flyctl status -a db-scout-scoring        # health check musí být „passing"
+```
+
+Databáze **nedostane veřejnou IP** — `infra/db/fly.toml` záměrně nemá
+sekci `[http_service]`. Je dosažitelná jen po privátní síti Fly na
+`db-scout-scoring.internal:8000`.
+
+## 3. Ověření dosažitelnosti z API
+
+Tohle je krok, který se nejčastěji přeskočí a pak se hledá hodinu:
+
+```sh
+flyctl ssh console -a api-scout-scoring -C \
+  "/app/bin/api rpc 'IO.inspect(:inet.getaddrs(~c\"db-scout-scoring.internal\", :inet6))'"
+```
+
+Privátní síť Fly (6PN) jezdí **výhradně po IPv6**, `*.internal` má jen AAAA
+záznam. Musí sedět obě strany a každá se láme jinak:
+
+- **Server**: `--bind [::]:8000`, ne `0.0.0.0:8000`. Socket na `0.0.0.0`
+  přijímá jen IPv4. Zákeřné na tom je, že databáze naběhne a **health check
+  Fly projde** (ten chodí zevnitř mašiny po IPv4), takže `flyctl status`
+  hlásí „passing", zatímco aplikace se nepřipojí. Přesně tahle past při
+  rozjezdu sklapla.
+- **Klient**: Mint (pod `Req`/`Finch`) má `inet6` ve výchozím stavu vypnuté.
+  `Api.SurrealDB` proto posílá
+  `connect_options: [transport_opts: [inet6: true]]` — zkusí IPv6 a při
+  neúspěchu spadne zpět na IPv4, takže totéž nastavení funguje i proti
+  localhostu ve vývoji.
+
+Ověřeno z produkční API mašiny proti nasazené databázi:
+
+```
+S inet6   : HTTP 200
+Bez inet6 : CHYBA Req.TransportError
+```
+
+Pokud `flyctl ssh console -C` nevrací výstup, použij
+`flyctl machine exec <id> -a api-scout-scoring "..."`.
+
+## 4. Přenos dat
+
+> **Stav k 18. 9. 2026:** kroky 1–3 jsou hotové. Aplikace `db-scout-scoring`
+> běží ve `fra` na volume `scout_db_data` (3 GB, šifrované, denní
+> snapshoty), verze 3.2.4, health check prochází, dosažitelnost z API
+> ověřena. Databáze je **prázdná** a API pořád jezdí na Surreal Cloud.
+> Odsud dál se sahá na živá data — dělej to mimo závod.
+
+Celý přenos dělá `infra/db/migrate-from-cloud.sh`:
+
+```sh
+OLD_URL="https://jacob-instance-06e7b91urprs5fprgc6vipcdt4.aws-euw1.surreal.cloud" \
+OLD_PASS='heslo ke Cloudu' \
+NEW_PASS='heslo k nové instanci' \
+  ./infra/db/migrate-from-cloud.sh
+```
+
+Obě hesla jsou ve správci hesel — `flyctl secrets list` ukazuje jen otisky.
+
+Skript **nepřepíná aplikaci**. Když doběhne, data jsou na obou místech a API
+pořád čte ze Cloudu. Přepnutí je vědomý druhý krok (sekce 5).
+
+### Proč po HTTP a ne přes `surreal` CLI
+
+Skript jede po endpointech `/export` a `/import`. Export starším klientem
+z novějšího serveru je zdroj tichých ztrát, a lokální CLI bývá pozadu —
+tenhle způsob ten problém obchází a nevyžaduje od tebe žádnou instalaci
+navíc (jen `flyctl`, `curl` a `jq`).
+
+### Co skript hlídá
+
+- **Prázdný export** — zastaví se, než cokoliv naimportuje. Uříznutý dump
+  vypadá jako úspěch, dokud ho nepotřebuješ.
+- **Neprázdný cíl** — odmítne importovat do databáze, která už data má.
+  Import by je smíchal, ne nahradil.
+- **Počty záznamů po tabulkách** na obou stranách, vypsané vedle sebe. Tohle
+  je jediný skutečný důkaz, že se přeneslo všechno; „import doběhl bez
+  chyby" to neznamená. Když nesedí, skript skončí nenulově a řekne ti, ať
+  aplikaci nepřepínáš.
+
+Mechanika skriptu (export → smazání → import → porovnání počtů) je ověřená
+proti nasazené instanci na syntetických datech, včetně úklidu.
+
+## 5. Přepnutí aplikace
+
+```sh
+flyctl secrets set --app api-scout-scoring \
+  SURREAL_URL="http://db-scout-scoring.internal:8000" \
+  SURREAL_PASS="$NEW_PASS"
+```
+
+Nastavení secrets samo vyvolá redeploy. `http://`, ne `https://` — uvnitř
+6PN je provoz šifrovaný na úrovni sítě a TLS by jen přidalo handshake,
+kvůli kterému se celá akce dělá.
+
+### Ověření, že to zabralo
+
+```sh
+flyctl logs -a api-scout-scoring | grep -E "timing |surrealdb "
+```
+
+V logu má být `db=` v jednotkách milisekund místo dosavadních ~85 ms.
+Pokud ne, přesun problém nevyřešil a instrumentace řekne proč — nepokračuj
+v mazání staré instance, dokud čísla nesedí.
+
+## 6. Zálohy
+
+**Starou instanci na Surreal Cloud nech běžet aspoň týden.** Je to jediná
+cesta zpátky, dokud si nová neodslouží jeden celý závod.
+
+Zálohy jsou dvě vrstvy:
+
+- **Snapshoty volume** dělá Fly sám denně (`flyctl volumes snapshots list
+  scout_db_data`). Chrání proti ztrátě disku, ne proti poškození dat —
+  snapshot běžící RocksDB nemusí být konzistentní.
+- **Logické exporty** přes `infra/db/backup.sh`. Tohle je ta záloha, na
+  které ve skutečnosti záleží.
+
+Obnovení otestuj hned, ne až bude potřeba:
+
+```sh
+./infra/db/backup.sh                     # vytvoří export
+# a zkus ho nahrát do prázdné lokální databáze
+```
+
+## Co zbývá dořešit
+
+- Kam odkládat exporty mimo Fly (S3/R2) — dokud leží jen na tom samém
+  volume, nechrání proti jeho ztrátě.
+- Alert na docházející místo na volume.
+- Jak se zachovat, když mašina s databází umře uprostřed závodu. Zatím je
+  odpověď „ruční obnovení ze zálohy", a to je potřeba mít napsané dřív, než
+  to nastane.

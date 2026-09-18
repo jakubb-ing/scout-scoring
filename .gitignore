@@ -1,3 +1,15 @@
 .DS_Store
 .agents/
 .claude/
+# Cache adresáře, které si nástroje zakládají tam, odkud je spustíš. Node
+# sem odkládá zkompilovaný bytecode, mix zámky a pubsub svého démona. Jsou
+# vázané na konkrétní stroj i verzi runtime a do gitu nepatří.
+node-compile-cache/
+.node-compile-cache/
+.cache/
+*.tsbuildinfo
+mix_lock_user*/
+mix_pubsub_user*/
+
+# Lokální exporty z infra/db/backup.sh — data ze závodů do gitu nepatří.
+backups/
