@@ -3,9 +3,8 @@
 import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, LogOut, Phone, QrCode, RefreshCw, WifiOff } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, MoreVertical, Phone, QrCode, RefreshCw, WifiOff } from "lucide-react";
 import { AppVersion } from "@/components/app-version";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,8 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { OfflineIndicator } from "@/components/station/offline-indicator";
+import { useStationStatus } from "@/components/station/use-station-status";
 import { RaceNotStarted } from "@/components/station/race-not-started";
 import { PatrolPicker } from "@/components/station/patrol-picker";
 import { ScoreForm } from "@/components/station/score-form";
@@ -28,12 +33,16 @@ import { useOutboxStatus } from "@/lib/offline/hooks";
 import { clearOutbox, resumeAuthBlocked } from "@/lib/offline/outbox";
 import { stationChainKey, pendingEntryFromPayload, type StationScorePayload } from "@/lib/offline/register";
 import { toPointStep, type Patrol, type ScoreEntry } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 
 type Mode = "pick" | "score";
 type PinExchangeState = "idle" | "pending" | "success" | "error";
 
 const LAST_STATION_KEY = "ss.station_last_id";
+
+// Položky ⋯ menu jsou sahací cíl na mobilu — větší než výchozí menu item.
+const MENU_ITEM = "gap-2.75 rounded-8 px-3.5 py-3 text-14";
 
 export default function StationPage() {
   const params = useParams<{ stationId: string }>();
@@ -125,6 +134,17 @@ export default function StationPage() {
     const pendingPatrols = new Set(pending.map((e) => e.patrol));
     return [...server.filter((e) => !pendingPatrols.has(e.patrol)), ...pending];
   }, [stationEntriesData, outbox.items]);
+
+  // Postup se ukazuje v hlavičce, ne v seznamu — počítá se tedy tady, kde jsou
+  // hlídky i zápisy pohromadě, a PatrolPicker dostává hotová čísla.
+  const progress = useMemo(() => {
+    const total = payload?.patrols.length ?? 0;
+    const doneIds = new Set(entries.map((e) => e.patrol));
+    const done = (payload?.patrols ?? []).filter((p) => doneIds.has(p.id)).length;
+    return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+  }, [payload, entries]);
+
+  const status = useStationStatus(stationChainKey(stationId), payload?.station.position ?? undefined);
 
   // 409 race_not_started — QR i PIN jsou v pořádku, závod jen ještě neběží.
   const notStarted = getNotStartedInfo(loginError) ?? getNotStartedInfo(stationMeError);
@@ -238,52 +258,80 @@ export default function StationPage() {
   const waitingCount = outbox.pendingCount + outbox.blockedCount + outbox.authBlockedCount;
 
   return (
-    <div className="flex flex-col overflow-hidden bg-scout-bg-app text-scout-text">
-      <header className="shrink-0 bg-scout-blue text-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
+    <div className="flex h-dvh flex-col overflow-hidden bg-scout-bg-app text-scout-text">
+      <header className={cn("shrink-0 text-white transition-colors", status.headerClass)}>
+        <div className="mx-auto max-w-4xl px-4 pt-2.75">
+          <div className="flex items-start gap-2">
             {mode === "score" ? (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={backToList}
-                className="text-white/80 hover:bg-white/10 hover:text-white"
+                className="-ml-2 shrink-0 text-white/80 hover:bg-white/10 hover:text-white"
                 aria-label="Zpět"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-            ) : (
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-scout-yellow" />
-            )}
-            <div className="min-w-0">
-              <div className="text-11 text-white/50">
-                Stanoviště
+            ) : null}
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.75 flex items-center gap-1.75">
+                <span className={cn("inline-block h-1.75 w-1.75 shrink-0 rounded-full", status.dotClass)} />
+                <span className="truncate text-11 font-semibold tracking-0.4 text-white/60">
+                  {status.caption}
+                </span>
               </div>
-              <div className="truncate text-20 font-bold leading-tight">{station.name}</div>
+              <div className="truncate text-21 font-bold">{station.name}</div>
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2 shrink-0 text-white/80 hover:bg-white/10 hover:text-white"
+                  aria-label="Další akce"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[214px] rounded-12">
+                <DropdownMenuItem onSelect={refresh} className={MENU_ITEM}>
+                  <RefreshCw className="h-4.5 w-4.5 text-scout-text-secondary" />
+                  Obnovit data
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className={MENU_ITEM}>
+                  <a href="tel:776884100">
+                    <Phone className="h-4.5 w-4.5 text-scout-text-secondary" />
+                    Zavolat podporu
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={requestLogout}
+                  className={cn(MENU_ITEM, "font-semibold text-scout-red focus:text-scout-red")}
+                >
+                  <LogOut className="h-4.5 w-4.5" />
+                  Odhlásit ze stanoviště
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          <div className="flex items-center gap-2">
-            <OfflineIndicator chainKeyPrefix={stationChainKey(stationId)} />
-            <Badge variant="secondary" className="hidden bg-white/10 text-white/80 sm:inline-flex">
-              {entries.length}/{payload.patrols.length} hlídek
-            </Badge>
-            <Button asChild variant="ghost" size="icon" className="text-white/80 hover:bg-white/10 hover:text-white" aria-label="Zavolat pořadateli">
-              <a href="tel:776884100">
-                <Phone className="h-4 w-4" />
-              </a>
-            </Button>
-            <Button variant="ghost" size="icon" onClick={refresh} className="text-white/80 hover:bg-white/10 hover:text-white" aria-label="Obnovit">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={requestLogout} className="text-white/80 hover:bg-white/10 hover:text-white" aria-label="Odhlásit stanoviště">
-              <LogOut className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-2.5 py-2.5">
+            <div className="h-1.25 flex-1 overflow-hidden rounded-full bg-white/20">
+              <div
+                className={cn("h-full rounded-full transition-all", status.barClass)}
+                style={{ width: `${progress.pct}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-12 font-semibold tabular-nums text-white/75">
+              {progress.done} / {progress.total} odbaveno
+            </span>
           </div>
         </div>
       </header>
 
-      <main ref={mainRef} className="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6">
+      <main ref={mainRef} className="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-3.5 pb-4 sm:px-6 sm:pb-6">
         {outbox.blockedCount > 0 ? (
           <BlockedEntriesNotice
             items={outbox.items.filter((i) => i.status === "blocked" && i.kind === "station.score")}
@@ -303,7 +351,7 @@ export default function StationPage() {
             />
           </div>
         ) : selected ? (
-          <div className="min-h-0 w-full">
+          <div className="min-h-0 w-full pt-4">
             <ScoreForm
               stationId={stationId}
               stationName={station.name}
@@ -373,7 +421,7 @@ function BlockedEntriesNotice({
 }) {
   const names = new Map(patrols.map((p) => [p.id, p.name]));
   return (
-    <div className="mb-4 rounded-12 border border-scout-yellow-border bg-scout-yellow-soft p-4 text-13">
+    <div className="my-4 rounded-12 border border-scout-yellow-border bg-scout-yellow-soft p-4 text-13">
       <div className="mb-2 font-semibold">
         {items.length === 1
           ? "1 hodnocení nešlo odeslat — závod byl mezitím uzavřen."

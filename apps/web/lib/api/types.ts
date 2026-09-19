@@ -245,6 +245,8 @@ export interface StationMePayload {
   station: {
     id: string;
     name: string;
+    /** Pořadí stanoviště pro hlavičku. Starší BE ho ještě neposílá. */
+    position?: number | null;
     point_step?: PointStep;
     criteria: StationCriterion[];
     race: string;
