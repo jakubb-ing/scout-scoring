@@ -216,3 +216,53 @@ Obnovení otestuj hned, ne až bude potřeba:
 - Jak se zachovat, když mašina s databází umře uprostřed závodu. Zatím je
   odpověď „ruční obnovení ze zálohy", a to je potřeba mít napsané dřív, než
   to nastane.
+
+## Připojení klientem z vlastního počítače
+
+Databáze nemá veřejnou IP, takže se k ní nepřipojíš přímo. Most je tunel po
+privátní síti Fly:
+
+```sh
+make db-tunnel        # drž běžící v jednom terminálu
+```
+
+Pak se připoj na `127.0.0.1:8001`:
+
+| Pole | Hodnota |
+|---|---|
+| Endpoint | `http://127.0.0.1:8001` nebo `ws://127.0.0.1:8001` |
+| Namespace | `scout_scoring` |
+| Database | `scout_scoring` |
+| Uživatel | `root` |
+| Heslo | ve správci hesel |
+
+Funguje Surrealist (používá WebSocket), `surreal sql` i obyčejné HTTP —
+ověřeno včetně zápisu.
+
+Z příkazové řádky:
+
+```sh
+echo "SELECT name, state FROM race;" | surreal sql \
+  --endpoint ws://127.0.0.1:8001 --username root --password "$PASS" \
+  --namespace scout_scoring --database scout_scoring
+```
+
+### Než začneš upravovat
+
+Jsou to živá data závodů, ne vývojová databáze, a `surreal sql` nemá undo.
+Před ruční úpravou si udělej zálohu — trvá pár sekund:
+
+```sh
+SURREAL_PASS='...' ./infra/db/backup.sh
+```
+
+Aplikace si navíc drží vlastní pravidla nad daty (stavy závodu, přepočty
+pořadí, audit log). Změna zapsaná přímo do databáze je obejde, takže u všeho,
+co jde udělat přes aplikaci, je lepší to udělat přes aplikaci.
+
+### Proč to nevystavujeme veřejně
+
+Vystavit databázi na veřejnou IP by znamenalo root přihlášení na otevřeném
+internetu, bez omezení počtu pokusů a s celým obsahem závodů za jedním
+heslem. Tunel dává tentýž přístup, ale jen tomu, kdo se umí přihlásit do
+Fly účtu, a nevyžaduje žádnou změnu konfigurace databáze.
