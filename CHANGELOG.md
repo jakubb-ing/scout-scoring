@@ -61,6 +61,19 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
 ### Added
 
+- Záložka Statistiky v dashboardu organizátora, dostupná u uzavřeného závodu:
+  - Backend endpoint `GET /api/races/:race_id/stats` — matice skóre hlídka ×
+    stanoviště, časy zápisů a provozní metriky stanovišť.
+  - Podzáložka Stanoviště: box ploty normalizované na % maxima, tabulka
+    rozlišovací schopnosti (σ, podíl na rozptylu, korelace s pořadím),
+    rozpad na kritéria s varováním u kritéria bez jediného bodu, histogram
+    a provozní signály.
+  - Podzáložka Hlídky: srovnání kategorií, rozsah skóre, histogram celkových
+    skóre a heatmapa z-skóre s upozorněním na pravděpodobně chybný zápis.
+  - Podzáložka Provoz: časová osa zápisů všech stanovišť, kadence po časových
+    oknech a pořadí zápisů s odstupy. Zápis bez ručního času se kreslí podle
+    času odeslání na server a je jako odhad označený.
+  - Export matice hodnocení do CSV.
 - Verzování přes release-please: Release PR drží v souladu `VERSION`,
   `mix.exs` a `package.json`; kontrola konvenčního názvu PR v CI.
 - Verze aplikace v patičce FE (`AppVersion` — login, dashboard, stanoviště)

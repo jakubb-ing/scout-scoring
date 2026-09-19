@@ -28,6 +28,17 @@ export function useResults(raceId: string | null | undefined) {
   });
 }
 
+// Statistika se počítá jen pro uzavřený závod — data se už nemění,
+// takže nemá smysl je znovu stahovat při každém přepnutí tabu.
+export function useRaceStats(raceId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.stats(raceId ?? "__nil__"),
+    queryFn: () => DashboardApi.getRaceStats(raceId as string),
+    enabled: !!raceId,
+    staleTime: Infinity,
+  });
+}
+
 export function useAuditLog(
   raceId: string | null | undefined,
   query: DashboardApi.AuditQuery = {},

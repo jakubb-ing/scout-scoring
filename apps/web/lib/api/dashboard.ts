@@ -4,6 +4,7 @@ import type {
   DashboardPayload,
   LeaderboardGroup,
   LeaderboardRow,
+  RaceStatsPayload,
   ResultsPayload,
   ScoreEntry,
 } from "./types";
@@ -89,5 +90,11 @@ export async function deleteScoreEntry(
     method: "DELETE",
     scope: "organizer",
     body: { reason },
+  });
+}
+
+export async function getRaceStats(raceId: string): Promise<RaceStatsPayload> {
+  return apiFetch<RaceStatsPayload>(`/api/races/${raceId}/stats`, {
+    scope: "organizer",
   });
 }

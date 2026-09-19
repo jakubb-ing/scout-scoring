@@ -149,7 +149,11 @@ const config: Config = {
         "32": ["32px", { lineHeight: "1" }],
       },
       borderRadius: {
+        "2": "2px",
+        "3": "3px",
         "4": "4px",
+        "5": "5px",
+        "6": "6px",
         "8": "8px",
         "10": "10px",
         "12": "12px",

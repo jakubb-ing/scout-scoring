@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Activity, ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users, Wrench } from "lucide-react";
+import { Activity, BarChart3, ClipboardList, LayoutDashboard, LogOut, Loader2, MapPinned, Menu, Settings, Users, Wrench } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import { OverviewTab } from "@/components/organizer/overview-tab";
 import { ActivityTab } from "@/components/organizer/activity-tab";
 import { PatrolsTab } from "@/components/organizer/patrols-tab";
 import { StationsTab } from "@/components/organizer/stations-tab";
+import { StatsTab } from "@/components/organizer/stats-tab";
 import { CorrectionsTab } from "@/components/organizer/corrections-tab";
 import { RaceStateFlow } from "@/components/organizer/race-state-flow";
 import { SettingsTab } from "@/components/organizer/settings-tab";
@@ -96,10 +97,13 @@ export default function DashboardPage() {
   // Opravy bodů jsou výhradně poopravný nástroj — tab dává smysl jen
   // u uzavřeného závodu a jen s právem editace.
   const canCorrect = current?.state === "closed" && current.access_role !== "read";
+  // Statistika se zobrazuje až po uzavření závodu.
+  const canStats = current?.state === "closed";
 
   useEffect(() => {
     if (tab === "corrections" && !canCorrect) setTab("overview");
-  }, [tab, canCorrect]);
+    if (tab === "stats" && !canStats) setTab("overview");
+  }, [tab, canCorrect, canStats]);
 
   async function onPrepare() {
     if (!confirm("Připravit závod ke spuštění? Vydají se PINy a QR kódy pro stanoviště — v tabu Stanoviště je pak můžeš vytisknout.")) return;
@@ -268,6 +272,12 @@ export default function DashboardPage() {
                 <MapPinned className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
                 <span className="sr-only sm:not-sr-only">Stanoviště</span>
               </TabsTrigger>
+              {canStats ? (
+                <TabsTrigger value="stats" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
+                  <BarChart3 className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Statistiky</span>
+                </TabsTrigger>
+              ) : null}
               {canCorrect ? (
                 <TabsTrigger value="corrections" className="mb-0 min-w-0 flex-1 gap-2 border-b-2.5 px-2 sm:flex-none sm:px-4.5">
                   <Wrench className="h-4 w-4 shrink-0 sm:hidden" aria-hidden="true" />
@@ -293,6 +303,11 @@ export default function DashboardPage() {
               <TabsContent value="stations" className="h-full">
                 <StationsTab raceId={current.id} />
               </TabsContent>
+              {canStats ? (
+                <TabsContent value="stats" className="h-full overflow-y-auto">
+                  <StatsTab raceId={current.id} />
+                </TabsContent>
+              ) : null}
               {canCorrect ? (
                 <TabsContent value="corrections" className="h-full">
                   <CorrectionsTab raceId={current.id} />
