@@ -9,6 +9,21 @@ projekt používá [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 - `MINOR` pro nové zpětně kompatibilní funkce.
 - `PATCH` pro opravy chyb a drobné bezpečné úpravy.
 
+## [0.3.0](https://github.com/jakubb-ing/scout-scoring/compare/v0.2.0...v0.3.0) (2026-09-19)
+
+
+### Features
+
+* closed races get a statistics tab that says what the race decided ([abd47a1](https://github.com/jakubb-ing/scout-scoring/commit/abd47a1a0b955e75624443307b38a24bfdf22f3d))
+* station header carries the state the judge needs at a glance ([69766c5](https://github.com/jakubb-ing/scout-scoring/commit/69766c5491768c5bbef1e72c1bd02c6fabdae829))
+* station point step ([513fff2](https://github.com/jakubb-ing/scout-scoring/commit/513fff2e3bee6d54a83c08e4890196f3ed5e3f19))
+* stats tab ([7f98e11](https://github.com/jakubb-ing/scout-scoring/commit/7f98e11127f8690253f9e09543225a326d6c5374))
+
+
+### Bug Fixes
+
+* migration script died silently on an empty target database ([c2480c4](https://github.com/jakubb-ing/scout-scoring/commit/c2480c44c41a6ce51c73419d65f3d56f2cb9b648))
+
 ## [0.2.0](https://github.com/jakubb-ing/scout-scoring/compare/v0.1.0...v0.2.0) (2026-09-18)
 
 
