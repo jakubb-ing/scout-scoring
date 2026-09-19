@@ -1,6 +1,7 @@
-# Redesign stránky stanoviště podle `docs/new_station.html` (varianta B)
+# Redesign stránky stanoviště podle mockupu `new_station.html` (varianta B)
 
-Mockup je bundlovaný React/Tailwind prototyp. Rozbalený zdroj designu je funkce
+Mockup byl bundlovaný React/Tailwind prototyp (`docs/new_station.html`, 1,3 MB —
+v repu se nedrží, zdroj má autor návrhu). Zdroj designu je funkce
 `HeaderB` + `PatrolList` + `MoreMenu` (sekce `b` v canvasu, artboardy
 `online` / `offline` / `rozbalené ⋯ menu`). Paleta `K` v mockupu se **shoduje**
 s `scout.*` tokeny v `apps/web/tailwind.config.ts`, font DM Sans už projekt
@@ -119,5 +120,5 @@ Doplnit do `scout`:
 Mockup pokrývá **jen hlavičku a frontu hlídek**. Skórovací formulář
 (`score-form.tsx`, `criteria-inputs.tsx`), obrazovka „závod neběží"
 (`race-not-started.tsx`) a přihlašovací stránka `app/station/page.tsx`
-zůstávají beze změny — pro ně v `new_station.html` není předloha. Pokud mají
+zůstávají beze změny — pro ně v mockupu není předloha. Pokud mají
 vypadat stejně, je potřeba doplnit návrh.
