@@ -61,6 +61,7 @@ export interface Category {
   name: string;
   slug?: string;
   race?: string;
+  scored?: boolean;
 }
 
 export interface Patrol {
@@ -245,6 +246,8 @@ export interface StationMePayload {
   station: {
     id: string;
     name: string;
+    /** Pořadí stanoviště pro hlavičku. Starší BE ho ještě neposílá. */
+    position?: number | null;
     point_step?: PointStep;
     criteria: StationCriterion[];
     race: string;
@@ -286,4 +289,52 @@ export interface AiImportRefineResponse {
 export interface BulkCreateStationsResponse {
   created: number;
   data: Station[];
+}
+
+export interface RaceStatsStationOps {
+  corrections_count: number;
+  queue_max_minutes?: number | null;
+  avg_duration_minutes?: number | null;
+}
+
+export interface RaceStatsStation {
+  id: string;
+  name: string;
+  position: number;
+  point_step: PointStep;
+  criteria: StationCriterion[];
+  max_points: number;
+  ops: RaceStatsStationOps;
+}
+
+export interface RaceStatsPatrol {
+  id: string;
+  start_number: number;
+  name: string;
+  category_id?: string | null;
+  category_name?: string | null;
+  category_scored: boolean;
+  withdrawn: boolean;
+}
+
+export interface RaceStatsEntry {
+  station_id: string;
+  patrol_id: string;
+  total_points: number;
+  criteria: Record<string, number>;
+  /** Ruční čas příchodu hlídky; vyplňuje rozhodčí, často chybí. */
+  arrived_at?: string | null;
+  /** Ruční čas odchodu hlídky; vyplňuje rozhodčí, často chybí. */
+  departed_at?: string | null;
+  /** Čas zápisu na server. Existuje vždy, u offline stanoviště je to čas synchronizace. */
+  created_at?: string | null;
+  corrected_at?: string | null;
+}
+
+export interface RaceStatsPayload {
+  race: Pick<Race, "id" | "name" | "state" | "time_tracking">;
+  stations: RaceStatsStation[];
+  patrols: RaceStatsPatrol[];
+  categories: Category[];
+  entries: RaceStatsEntry[];
 }

@@ -86,6 +86,7 @@ defmodule ApiWeb.Router do
     get "/races/:race_id/dashboard", DashboardController, :show
     get "/races/:race_id/leaderboard", DashboardController, :leaderboard
     get "/races/:race_id/results", DashboardController, :results
+    get "/races/:race_id/stats", DashboardController, :stats
     get "/races/:race_id/audit", DashboardController, :audit
 
     post "/races/:race_id/scores/correct", ScoreCorrectionController, :upsert

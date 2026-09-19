@@ -53,9 +53,7 @@ export function PatrolPicker({
 
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
-      <ProgressSummary done={done.length} total={sorted.length} />
-
-      <div className="min-h-0 flex-1 overflow-y-auto py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <SectionLabel>Čekají na odbavení ({waiting.length})</SectionLabel>
         {waiting.map((p) => (
           <PatrolRow
@@ -93,32 +91,12 @@ export function PatrolPicker({
   );
 }
 
-function ProgressSummary({ done, total }: { done: number; total: number }) {
-  const waiting = Math.max(0, total - done);
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-3.5 shrink-0 border-b border-scout-border bg-white px-3.5 py-2.5 sm:mx-0 sm:rounded-12 sm:border">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="text-15 font-bold tabular-nums text-scout-text">
-          {done} / {total} <span className="font-normal text-scout-text-muted">odbaveno</span>
-        </div>
-        <div className="text-12 tabular-nums text-scout-text-muted">
-          {waiting > 0 ? `${waiting} čeká` : "hotovo"}
-        </div>
-      </div>
-      <div className="mt-2 h-1.25 overflow-hidden rounded-full bg-scout-bg-track">
-        <div
-          className={cn("h-full transition-all", waiting === 0 ? "bg-scout-green" : "bg-scout-blue")}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+    <div className="px-0 pb-1.75 pt-3 text-11 font-bold uppercase tracking-0.7 text-scout-text-muted">
+      {children}
     </div>
   );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-0 py-2 text-11 font-semibold uppercase tracking-0.6 text-scout-text-muted">{children}</div>;
 }
 
 function PatrolRow({
@@ -152,7 +130,7 @@ function PatrolRow({
       type="button"
       onClick={() => onSelect(patrol.id)}
       className={cn(
-        "mb-1.75 flex w-full items-center gap-3 rounded-10 border-1.5 bg-white px-3.5 py-3 text-left transition",
+        "mb-2 flex w-full items-center gap-3 rounded-12 border bg-white px-3.25 py-2.75 text-left transition",
         done
           ? pending
             ? "border-scout-yellow-border opacity-75"
@@ -164,10 +142,10 @@ function PatrolRow({
     >
       <span
         className={cn(
-          // h-11/w-11 musí zůstat stejné, jinak z kruhu vyjde ovál. Dřív tu
+          // h-10/w-10 musí zůstat stejné, jinak z kruhu vyjde ovál. Dřív tu
           // bylo h-11.5/w-11.5, jenže 11.5 v paletě není, takže se rozměr
           // vůbec nevykreslil a odznak se scvrkl na šířku číslice.
-          "grid h-11 w-11 shrink-0 place-items-center rounded-full text-18 font-bold tabular-nums text-white",
+          "grid h-10 w-10 shrink-0 place-items-center rounded-full text-15 font-bold tabular-nums text-white",
           done ? (pending ? "bg-scout-yellow text-scout-text" : "bg-scout-green") : "bg-scout-blue"
         )}
       >

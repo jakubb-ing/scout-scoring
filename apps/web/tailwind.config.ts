@@ -53,6 +53,12 @@ const config: Config = {
             deep: "#1B3260",
             hero: "#1E5A88",
           },
+          // Pozadí hlavičky stanoviště, když se zápisy neodesílají. Tmavý
+          // jantar, aby bílý text i žlutý progress nad ním držely kontrast.
+          offline: "#5E4418",
+          // Tečka stavu v hlavičce — svítivější než scout-green, který se na
+          // modré ztrácí.
+          online: "#4ADE80",
           yellow: {
             DEFAULT: "#F49E00",
             soft: "#FEF5E0",
@@ -143,7 +149,11 @@ const config: Config = {
         "32": ["32px", { lineHeight: "1" }],
       },
       borderRadius: {
+        "2": "2px",
+        "3": "3px",
         "4": "4px",
+        "5": "5px",
+        "6": "6px",
         "8": "8px",
         "10": "10px",
         "12": "12px",
@@ -164,8 +174,10 @@ const config: Config = {
       },
       letterSpacing: {
         tightest: "-0.2px",
+        "0.4": "0.4px",
         "0.5": "0.5px",
         "0.6": "0.6px",
+        "0.7": "0.7px",
         pin: "8px",
       },
       boxShadow: {

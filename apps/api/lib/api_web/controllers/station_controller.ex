@@ -80,6 +80,9 @@ defmodule ApiWeb.StationController do
       station: %{
         id: station["id"],
         name: station["name"],
+        # Pořadí stanoviště — rozhodčí podle něj v hlavičce pozná, že má
+        # otevřené to správné stanoviště.
+        position: station["position"],
         point_step: Races.normalize_point_step(station["point_step"]),
         criteria: station["criteria"],
         race: race_id

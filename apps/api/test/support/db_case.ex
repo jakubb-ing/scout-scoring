@@ -89,13 +89,18 @@ defmodule Api.DBCase do
   def create_race(attrs \\ %{}) do
     organizer_id = Map.get_lazy(attrs, :organizer_id, fn -> create_organizer() end)
 
-    {:ok, race} =
-      Api.Races.create_race(organizer_id, %{
-        "name" => Map.get(attrs, :name, "Závod #{System.unique_integer([:positive])}")
-      })
+    payload =
+      %{"name" => Map.get(attrs, :name, "Závod #{System.unique_integer([:positive])}")}
+      |> maybe_put("time_tracking", Map.get(attrs, :time_tracking))
+      |> maybe_put("scoring_model", Map.get(attrs, :scoring_model))
+
+    {:ok, race} = Api.Races.create_race(organizer_id, payload)
 
     {race["id"], organizer_id}
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   @doc """
   Založí kategorii a vrátí její id. Jméno je unikátní — schéma má na
